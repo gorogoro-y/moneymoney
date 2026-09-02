@@ -23,19 +23,19 @@
 
       <!-- 操作ボタン群 -->
       <div class="flex flex-wrap items-center gap-2">
-        <!-- 自動保存状態バッジ -->
-        <div id="syncStatusBadge" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5" title="データは入力・変更時にブラウザ内へ常時自動保存されています">
+        <!-- 自動保存ステータス（保存時刻を常時表示） -->
+        <div id="saveStatusIndicator" class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg bg-emerald-950/60 text-emerald-400 border border-emerald-500/40 flex items-center gap-1.5 shadow-sm" title="データはブラウザ内にリアルタイムで自動保存されています">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
-          <span id="syncStatusText">自動保存ON</span>
+          <span id="saveStatusTimeText">自動保存: 有効</span>
         </div>
 
         <!-- バックアップ保存・復元 -->
-        <button onclick="exportDataToFile()" title="現在のデータをJSONファイルとしてローカルに保存（バックアップ）" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 hover:text-white flex items-center gap-1 transition">
-          💾 バックアップ保存
+        <button onclick="exportDataToFile()" title="現在のデータをJSONファイルとしてパソコンに保存（バックアップ）" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 hover:text-white flex items-center gap-1 transition">
+          💾 ファイル保存
         </button>
 
         <button onclick="document.getElementById('fileInput').click()" title="保存したJSONファイルを読み込んでデータを復元" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/30 hover:bg-sky-500/20 flex items-center gap-1 transition">
-          📂 復元 (読込)
+          📂 読込
         </button>
         <input type="file" id="fileInput" accept=".json" class="hidden" onchange="loadFromFile(event)">
 
@@ -56,9 +56,9 @@
   <main class="max-w-4xl mx-auto p-4 space-y-5">
 
     <!-- 自動保存トースト通知 -->
-    <div id="saveToast" class="transition-opacity duration-300 opacity-0 fixed bottom-4 right-4 z-50 bg-slate-800/95 text-emerald-400 border border-slate-700 px-3.5 py-2 rounded-xl text-xs shadow-2xl flex items-center gap-2 pointer-events-none">
+    <div id="saveToast" class="transition-all duration-300 opacity-0 translate-y-2 fixed bottom-4 right-4 z-50 bg-slate-800/95 text-emerald-400 border border-slate-700 px-3.5 py-2 rounded-xl text-xs shadow-2xl flex items-center gap-2 pointer-events-none">
       <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-      <span id="saveToastText">自動保存完了</span>
+      <span id="saveToastText">自動保存しました</span>
     </div>
 
     <!-- 月選択 & 総額表示パネル -->
@@ -135,6 +135,14 @@
 
     <!-- タブ3: 年払い・固定費設定リスト -->
     <div id="tabContent-recurring" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 hidden"></div>
+
+    <!-- フッター部：データ管理（全リセットボタンなど） -->
+    <div class="pt-6 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+      <div id="dataCountSummary">登録明細: 0件 | カード/口座: 0件 | 年払い: 0件</div>
+      <button onclick="resetToDefaultData()" class="text-slate-500 hover:text-rose-400 underline transition">
+        初期サンプルデータに戻す
+      </button>
+    </div>
 
   </main>
 
@@ -303,73 +311,85 @@
 
     // --- 自動保存トースト表示 ---
     let toastTimeout = null;
-    function showSaveToast(message = "ブラウザに自動保存しました") {
+    function showSaveToast(message = "自動保存しました") {
       const toast = document.getElementById("saveToast");
       const toastText = document.getElementById("saveToastText");
+      if (!toast || !toastText) return;
       toastText.innerText = message;
-      toast.classList.remove("opacity-0");
-      toast.classList.add("opacity-100");
+      toast.classList.remove("opacity-0", "translate-y-2");
+      toast.classList.add("opacity-100", "translate-y-0");
       if (toastTimeout) clearTimeout(toastTimeout);
       toastTimeout = setTimeout(() => {
-        toast.classList.remove("opacity-100");
-        toast.classList.add("opacity-0");
-      }, 1500);
+        toast.classList.remove("opacity-100", "translate-y-0");
+        toast.classList.add("opacity-0", "translate-y-2");
+      }, 1800);
     }
 
     // --- ローカルストレージ読込・自動保存 ---
     function loadFromLocalStorage() {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        try {
+      let isLoaded = false;
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
           const parsed = JSON.parse(saved);
-          sources = parsed.sources || [];
-          expenses = parsed.expenses || [];
-          recurringList = parsed.recurringList || [];
-          return;
-        } catch (e) {
-          console.error("読込エラー", e);
+          if (parsed && Array.isArray(parsed.sources)) {
+            sources = parsed.sources;
+            expenses = parsed.expenses || [];
+            recurringList = parsed.recurringList || [];
+            isLoaded = true;
+          }
         }
+      } catch (e) {
+        console.warn("LocalStorageの読み込みに失敗しました（初期データを使用します）:", e);
       }
-      sources = [...defaultData.sources];
-      expenses = [...defaultData.expenses];
-      recurringList = [...defaultData.recurringList];
-      saveData(false);
+
+      if (!isLoaded) {
+        sources = JSON.parse(JSON.stringify(defaultData.sources));
+        expenses = JSON.parse(JSON.stringify(defaultData.expenses));
+        recurringList = JSON.parse(JSON.stringify(defaultData.recurringList));
+        saveData(false);
+      }
     }
 
     // すべての変更時に即時呼ばれる自動保存関数
     function saveData(showToast = true) {
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
       const payload = {
         version: "1.0",
-        lastSaved: new Date().toISOString(),
+        lastSaved: now.toISOString(),
         sources,
         expenses,
         recurringList
       };
+
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        // ヘッダーの保存時刻表示を更新
+        const statusText = document.getElementById("saveStatusTimeText");
+        if (statusText) {
+          statusText.innerText = `保存済: ${timeStr}`;
+        }
         if (showToast) {
-          showSaveToast("自動保存完了");
+          showSaveToast(`ブラウザ内に自動保存しました (${timeStr})`);
         }
       } catch (err) {
-        console.error("ローカルストレージ保存エラー", err);
+        console.error("LocalStorageへの保存に失敗しました:", err);
       }
     }
 
-    // --- 安全なファイルダウンロード保存（iframe対応） ---
-    function downloadBlob(content, filename, contentType) {
-      const blob = new Blob([content], { type: contentType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 100);
+    // --- 初期サンプルデータに戻す ---
+    function resetToDefaultData() {
+      if (!confirm("すべてのデータを初期のサンプル状態にリセットしますか？\n（現在の入力内容は消去されます）")) return;
+      sources = JSON.parse(JSON.stringify(defaultData.sources));
+      expenses = JSON.parse(JSON.stringify(defaultData.expenses));
+      recurringList = JSON.parse(JSON.stringify(defaultData.recurringList));
+      saveData(true);
+      render();
     }
 
-    // --- バックアップ用ファイルエクスポート ---
-    async function exportDataToFile() {
+    // --- 安全なファイルダウンロード保存（バックアップ） ---
+    function exportDataToFile() {
       const dataStr = JSON.stringify({
         version: "1.0",
         exportedAt: new Date().toISOString(),
@@ -379,31 +399,16 @@
       }, null, 2);
 
       const defaultFilename = `money_manager_backup_${new Date().toISOString().slice(0, 10)}.json`;
-
-      // 1. 最上位ウィンドウでFile System Access APIが許可されている場合のみ試行
-      if (window.self === window.top && "showSaveFilePicker" in window) {
-        try {
-          const handle = await window.showSaveFilePicker({
-            suggestedName: defaultFilename,
-            types: [{
-              description: "マネーマネージャー データ (*.json)",
-              accept: { "application/json": [".json"] }
-            }]
-          });
-          const writable = await handle.createWritable();
-          await writable.write(dataStr);
-          await writable.close();
-          showSaveToast("ファイルに保存しました");
-          return;
-        } catch (err) {
-          if (err.name === "AbortError") return;
-          // セキュリティエラーやiframe内などで失敗した場合は通常のダウンロードへ安全にフォールバック
-        }
-      }
-
-      // 2. iframe環境および標準フォールバック
-      downloadBlob(dataStr, defaultFilename, "application/json");
-      showSaveToast("JSONファイルを保存しました");
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = defaultFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      showSaveToast("JSONバックアップファイルを保存しました");
     }
 
     // --- JSONファイル読み込み復元 ---
@@ -415,14 +420,14 @@
       reader.onload = function(e) {
         try {
           const parsed = JSON.parse(e.target.result);
-          if (!parsed.sources || !parsed.expenses || !parsed.recurringList) {
+          if (!parsed.sources || !Array.isArray(parsed.sources)) {
             alert("マネーマネージャーの有効なデータファイルではありません。");
             return;
           }
           if (confirm("選択したファイルの内容で復元しますか？（現在のデータは上書きされます）")) {
-            sources = parsed.sources;
-            expenses = parsed.expenses;
-            recurringList = parsed.recurringList;
+            sources = parsed.sources || [];
+            expenses = parsed.expenses || [];
+            recurringList = parsed.recurringList || [];
             saveData(true);
             render();
             alert("データを正常に復元しました！");
@@ -601,6 +606,12 @@
         `;
       }).join("");
 
+      // フッター集計カウント
+      const countEl = document.getElementById("dataCountSummary");
+      if (countEl) {
+        countEl.innerText = `登録明細: ${expenses.length}件 | カード/口座: ${sources.length}件 | 年払い: ${recurringList.length}件`;
+      }
+
       updateSelectOptions();
     }
 
@@ -627,8 +638,8 @@
       const expSelect = document.getElementById("expSourceSelect");
       const recSelect = document.getElementById("recSourceSelect");
       const opts = sources.map(s => `<option value="${s.id}">${s.name} (${s.type === 'CREDIT' ? 'クレカ' : '銀行振替'})</option>`).join("");
-      expSelect.innerHTML = opts;
-      recSelect.innerHTML = opts;
+      if (expSelect) expSelect.innerHTML = opts;
+      if (recSelect) recSelect.innerHTML = opts;
     }
 
     function handleCreateExpense(e) {
@@ -705,20 +716,33 @@
       }
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
+    // --- 初期化処理（即時実行 & DOMContentLoaded両対応） ---
+    function initApp() {
       loadFromLocalStorage();
 
-      document.getElementById("expDateInput").value = new Date().toISOString().split("T")[0];
+      const dateInput = document.getElementById("expDateInput");
+      if (dateInput) {
+        dateInput.value = new Date().toISOString().split("T")[0];
+      }
+
       const bankSelect = document.getElementById("srcBankPaySelect");
-      for (let i = 1; i <= 28; i++) {
-        const opt = document.createElement("option");
-        opt.value = i;
-        opt.innerText = `毎月 ${i} 日`;
-        if (i === 25) opt.selected = true;
-        bankSelect.appendChild(opt);
+      if (bankSelect && bankSelect.children.length === 0) {
+        for (let i = 1; i <= 28; i++) {
+          const opt = document.createElement("option");
+          opt.value = i;
+          opt.innerText = `毎月 ${i} 日`;
+          if (i === 25) opt.selected = true;
+          bankSelect.appendChild(opt);
+        }
       }
       render();
-    });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initApp);
+    } else {
+      initApp();
+    }
   </script>
 </body>
 </html>
