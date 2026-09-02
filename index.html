@@ -3,307 +3,319 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>マネーマネージャー</title>
+  <title>MoneyMoney</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen pb-12">
+<body class="bg-slate-100 text-slate-800 min-h-screen pb-16">
 
-  <!-- ヘッダー -->
-  <header class="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-30 px-4 py-3 backdrop-blur">
-    <div class="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 class="font-bold text-base text-white flex items-center gap-2">
-          💰 マネーマネージャー
-        </h1>
-        <p class="text-xs text-slate-400">クレカ（締め日計算） ＋ 銀行振替 ＋ 年払い固定費</p>
-      </div>
+  <!-- ヘッダー：タイトルと大きな明細入力ボタンのみ -->
+  <header class="border-b border-slate-200 bg-white sticky top-0 z-30 px-4 py-3 shadow-sm">
+    <div class="max-w-4xl mx-auto flex items-center justify-between gap-2">
+      <h1 class="font-black text-xl text-slate-900 flex items-center gap-1.5">
+        💰 MoneyMoney
+      </h1>
 
-      <!-- 操作ボタン群 -->
-      <div class="flex flex-wrap items-center gap-2">
-        <!-- ローカルファイル自動同期ボタン & ステータス -->
-        <button id="syncFileBtn" onclick="handleSyncButtonClick()" title="PC上のローカルファイルを指定して、入力のたびに自動上書き保存します" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/20 flex items-center gap-1.5 transition">
-          <span id="syncDot" class="w-2 h-2 rounded-full bg-slate-500 inline-block"></span>
-          <span id="syncBtnText">📁 ローカルファイルと同期</span>
-        </button>
-
-        <!-- 手動バックアップ/読込 -->
-        <button onclick="exportDataToFile()" title="現在のデータをJSONファイルとしてダウンロード保存" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 hover:text-white flex items-center gap-1 transition">
-          💾 ダウンロード
-        </button>
-
-        <button onclick="document.getElementById('fileInput').click()" title="保存したJSONファイルを開いてデータを復元" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/30 hover:bg-sky-500/20 flex items-center gap-1 transition">
-          📂 読込
-        </button>
-        <input type="file" id="fileInput" accept=".json" class="hidden" onchange="loadFromFile(event)">
-
-        <!-- データ登録モーダルボタン -->
-        <button onclick="openModal('recurringModal')" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition">
-          ＋ 年払い
-        </button>
-        <button onclick="openModal('sourceModal')" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 transition">
-          ＋ 口座・カード
-        </button>
-        <button onclick="openModal('expenseModal')" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow transition">
-          ＋ 明細入力
-        </button>
-      </div>
+      <!-- 明細入力ボタン -->
+      <button onclick="openExpenseModalWithSource()" class="px-5 py-2.5 text-sm font-black rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md flex items-center gap-1 active:scale-95 transition">
+        <span class="text-lg leading-none">＋</span> 明細入力
+      </button>
     </div>
   </header>
 
-  <main class="max-w-5xl mx-auto p-4 space-y-5">
-
-    <!-- 自動同期・保存案内バナー -->
-    <div id="syncInfoBanner" class="bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-3.5 text-xs text-indigo-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-      <div class="flex items-center gap-2.5">
-        <span class="text-base">🔄</span>
-        <div>
-          <span class="font-bold text-white">ローカル自動保存機能：</span>
-          <span id="syncBannerMessage">
-            「📁 ローカルファイルと同期」を押してPC内のファイル（例: `money_data.json`）を指定すると、明細の追加・削除のたびにそのファイルへ自動で上書き保存されます。
-          </span>
-        </div>
-      </div>
-    </div>
+  <main class="max-w-4xl mx-auto p-4 space-y-5">
 
     <!-- 自動保存トースト通知 -->
-    <div id="saveToast" class="transition-all duration-300 opacity-0 translate-y-2 fixed bottom-4 right-4 z-50 bg-slate-800/95 text-emerald-400 border border-slate-700 px-3.5 py-2 rounded-xl text-xs shadow-2xl flex items-center gap-2 pointer-events-none">
+    <div id="saveToast" class="transition-all duration-300 opacity-0 translate-y-2 fixed bottom-4 right-4 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs shadow-xl flex items-center gap-2 pointer-events-none">
       <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-      <span id="saveToastText">ローカルファイルへ自動保存しました</span>
+      <span id="saveToastText">自動保存しました</span>
     </div>
 
     <!-- 月選択 & 総額表示パネル -->
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow space-y-4">
+    <div class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
       <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-3">
-          <button onclick="changeMonth(-1)" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">◀</button>
+          <button onclick="changeMonth(-1)" class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold active:scale-95 transition">◀</button>
           <div class="text-center min-w-[120px]">
             <span class="text-[10px] text-slate-400 font-bold block">引き落とし月</span>
-            <span id="currentMonthLabel" class="text-2xl font-black text-indigo-300">2026年 10月</span>
+            <span id="currentMonthLabel" class="text-2xl font-black text-indigo-600">2026年 10月</span>
           </div>
-          <button onclick="changeMonth(1)" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">▶</button>
+          <button onclick="changeMonth(1)" class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold active:scale-95 transition">▶</button>
         </div>
 
-        <div class="w-full sm:w-auto bg-slate-950 border border-slate-800 px-5 py-3 rounded-xl flex items-center justify-between sm:justify-end gap-6">
+        <div class="w-full sm:w-auto bg-slate-50 border border-slate-200 px-5 py-3 rounded-xl flex items-center justify-between sm:justify-end gap-6">
           <div>
-            <span class="text-[10px] text-slate-400 block font-medium">当月の引落し予定総額</span>
-            <span id="grandTotalLabel" class="text-2xl sm:text-3xl font-black text-emerald-400">¥0</span>
+            <span class="text-[10px] text-slate-500 block font-medium">当月の引落し予定総額</span>
+            <span id="grandTotalLabel" class="text-2xl sm:text-3xl font-black text-orange-700">¥0</span>
           </div>
-          <div class="text-right border-l border-slate-800 pl-4 text-[11px] text-slate-400 space-y-0.5">
-            <div>通常明細: <span id="regularSubtotalLabel" class="text-slate-200 font-semibold">¥0</span></div>
-            <div>年払・固定: <span id="recurringSubtotalLabel" class="text-amber-300 font-semibold">¥0</span></div>
+          <div class="text-right border-l border-slate-200 pl-4 text-[11px] text-slate-500 space-y-0.5">
+            <div>通常明細: <span id="regularSubtotalLabel" class="text-slate-800 font-bold">¥0</span></div>
+            <div>年払・固定: <span id="recurringSubtotalLabel" class="text-amber-700 font-bold">¥0</span></div>
           </div>
         </div>
       </div>
 
       <!-- 引き落とし予定総額の内訳（カード・口座ごとの日付＆金額） -->
-      <div class="pt-3 border-t border-slate-800/80">
-        <div class="text-[11px] font-semibold text-slate-400 mb-2 flex items-center gap-1.5">
+      <div class="pt-3 border-t border-slate-100">
+        <div class="text-[11px] font-semibold text-slate-500 mb-2 flex items-center gap-1.5">
           <span>📅</span> カード・口座別の引き落とし予定日
         </div>
-        <div id="topSourceDueList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2"></div>
+        <div id="topSourceDueList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5"></div>
       </div>
 
       <!-- 年払い発生アラート -->
-      <div id="recurringAlertBox" class="bg-amber-950/40 border border-amber-500/40 rounded-xl p-3 text-xs text-amber-200 hidden">
-        <span class="font-bold">⚠️【年払い・定期支払い月】</span>
+      <div id="recurringAlertBox" class="bg-amber-50 border border-amber-300 rounded-xl p-3 text-xs text-amber-900 hidden">
+        <span class="font-bold text-amber-800">⚠️【年払い・定期支払いの引落月】</span>
         <span id="recurringAlertText"></span>
       </div>
     </div>
 
     <!-- タブ切り替えボタン -->
-    <div class="flex border-b border-slate-800 text-xs font-semibold gap-4">
-      <button onclick="switchTab('summary')" id="tabBtn-summary" class="pb-2 border-b-2 border-indigo-500 text-indigo-400">
-        カード・口座別 内訳
+    <div class="flex border-b border-slate-200 text-xs font-semibold gap-4">
+      <button onclick="switchTab('expenses')" id="tabBtn-expenses" class="pb-2.5 border-b-2 border-indigo-600 text-indigo-600">
+        当月の利用明細（カード別）
       </button>
-      <button onclick="switchTab('expenses')" id="tabBtn-expenses" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200">
-        当月の利用明細
-      </button>
-      <button onclick="switchTab('recurring')" id="tabBtn-recurring" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200">
+      <button onclick="switchTab('recurring')" id="tabBtn-recurring" class="pb-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
         年払い・固定費一覧
       </button>
-    </div>
-
-    <!-- タブ1: 口座・カード別サマリー -->
-    <div id="tabContent-summary" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
-
-    <!-- タブ2: 明細一覧 -->
-    <div id="tabContent-expenses" class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hidden">
-      <table class="w-full text-left text-xs text-slate-300">
-        <thead class="bg-slate-950 text-slate-400 border-b border-slate-800">
-          <tr>
-            <th class="p-3">利用日</th>
-            <th class="p-3">支払元</th>
-            <th class="p-3">品目 / メモ</th>
-            <th class="p-3">引落予定日</th>
-            <th class="p-3 text-right">金額</th>
-            <th class="p-3 text-center">操作</th>
-          </tr>
-        </thead>
-        <tbody id="expensesTableBody" class="divide-y divide-slate-800/60"></tbody>
-      </table>
-    </div>
-
-    <!-- タブ3: 年払い・固定費設定リスト -->
-    <div id="tabContent-recurring" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 hidden"></div>
-
-    <!-- フッター部：データ管理（全リセットボタンなど） -->
-    <div class="pt-6 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-      <div id="dataCountSummary">登録明細: 0件 | カード/口座: 0件 | 年払い: 0件</div>
-      <button onclick="resetToDefaultData()" class="text-slate-500 hover:text-rose-400 underline transition">
-        初期サンプルデータに戻す
+      <button onclick="switchTab('sources')" id="tabBtn-sources" class="pb-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+        カード・口座の管理
       </button>
+    </div>
+
+    <!-- タブ1: カード・口座別 統合明細リスト -->
+    <div id="tabContent-expenses" class="space-y-4"></div>
+
+    <!-- タブ2: 年払い・固定費一覧 -->
+    <div id="tabContent-recurring" class="space-y-4 hidden">
+      <div class="flex justify-between items-center bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+        <span class="text-xs text-slate-500">年1回や毎月決まった固定費を登録できます。</span>
+        <button onclick="openCreateRecurringModal()" class="px-3 py-2 text-xs font-bold rounded-lg bg-amber-600 hover:bg-amber-700 text-white shadow-sm transition active:scale-95">
+          ＋ 年払い・固定費を追加
+        </button>
+      </div>
+      <div id="recurringListContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5"></div>
+    </div>
+
+    <!-- タブ3: カード・口座の管理 -->
+    <div id="tabContent-sources" class="space-y-4 hidden">
+      <div class="flex justify-between items-center bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+        <span class="text-xs text-slate-500">締め日・支払日ルールを設定できます。</span>
+        <button onclick="openCreateSourceModal()" class="px-3 py-2 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition active:scale-95">
+          ＋ 口座・カードを追加
+        </button>
+      </div>
+      <div id="sourcesListContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5"></div>
+    </div>
+
+    <!-- 下部：DL / UL ボタンおよび各種設定・管理メニュー -->
+    <div class="pt-4 border-t border-slate-200 space-y-3">
+      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+        <div class="text-xs font-bold text-slate-700">⚙️ メニュー・データ管理</div>
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- 下部に配置した DL / UL ボタン -->
+          <button onclick="exportDataToFile()" class="px-3 py-2 text-xs font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center gap-1 transition active:scale-95">
+            💾 DL (保存)
+          </button>
+          <button onclick="document.getElementById('fileInput').click()" class="px-3 py-2 text-xs font-bold rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-300 flex items-center gap-1 transition active:scale-95">
+            📂 UL (読込)
+          </button>
+          <input type="file" id="fileInput" accept=".json" class="hidden" onchange="loadFromFile(event)">
+
+          <div class="h-4 w-px bg-slate-300 mx-1 hidden sm:block"></div>
+
+          <!-- 各種追加ボタン -->
+          <button onclick="openCreateSourceModal()" class="px-3 py-2 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition">
+            ＋ 口座・カードを追加
+          </button>
+          <button onclick="openCreateRecurringModal()" class="px-3 py-2 text-xs font-semibold rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition">
+            ＋ 年払い・固定費を追加
+          </button>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 px-1">
+        <div id="dataCountSummary">登録明細: 0件 | カード/口座: 0件 | 年払い: 0件</div>
+        <button onclick="resetToDefaultData()" class="text-slate-500 hover:text-rose-600 underline">
+          初期サンプルデータに戻す
+        </button>
+      </div>
     </div>
 
   </main>
 
   <!-- モーダル: 明細入力 -->
-  <div id="expenseModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-4 text-xs">
-      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-        <h3 class="font-bold text-slate-100 text-sm">利用明細の追加</h3>
-        <button onclick="closeModal('expenseModal')" class="text-slate-400 hover:text-white">✕</button>
+  <div id="expenseModal" class="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-5 space-y-4 text-xs shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <h3 class="font-bold text-slate-900 text-sm">利用明細の追加</h3>
+        <button onclick="closeModal('expenseModal')" class="text-slate-400 hover:text-slate-700 text-base">✕</button>
       </div>
       <form onsubmit="handleCreateExpense(event)" class="space-y-3">
         <div>
-          <label class="text-slate-400 block mb-1">支払元（カード / 口座）</label>
-          <select id="expSourceSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200"></select>
+          <label class="text-slate-600 block mb-1 font-medium">支払元（カード / 口座）</label>
+          <select id="expSourceSelect" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500"></select>
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="text-slate-400 block mb-1">利用日</label>
-            <input type="date" id="expDateInput" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200">
+            <label class="text-slate-600 block mb-1 font-medium">利用日</label>
+            <input type="date" id="expDateInput" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
           </div>
           <div>
-            <label class="text-slate-400 block mb-1">金額 (円)</label>
-            <input type="number" id="expAmountInput" required placeholder="3000" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200">
+            <label class="text-slate-600 block mb-1 font-medium">金額 (円)</label>
+            <input type="number" id="expAmountInput" required placeholder="3000" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
           </div>
         </div>
         <div>
-          <label class="text-slate-400 block mb-1">内容・店名</label>
-          <input type="text" id="expMemoInput" placeholder="スーパー、ドラッグストアなど" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200">
+          <label class="text-slate-600 block mb-1 font-medium">内容・店名</label>
+          <input type="text" id="expMemoInput" placeholder="スーパー、ドラッグストアなど" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
         </div>
         <div class="pt-2 flex gap-2">
-          <button type="button" onclick="closeModal('expenseModal')" class="flex-1 py-2 bg-slate-800 rounded-lg text-slate-300">閉じる</button>
-          <button type="submit" class="flex-1 py-2 bg-indigo-600 font-bold rounded-lg text-white shadow">登録</button>
+          <button type="button" onclick="closeModal('expenseModal')" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg">閉じる</button>
+          <button type="submit" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 font-bold rounded-lg text-white shadow-sm">登録</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- モーダル: 年払い・固定費登録 -->
-  <div id="recurringModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-4 text-xs">
-      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-        <h3 class="font-bold text-slate-100 text-sm">年払い・固定費の登録</h3>
-        <button onclick="closeModal('recurringModal')" class="text-slate-400 hover:text-white">✕</button>
+  <!-- モーダル: 年払い・固定費登録/編集 -->
+  <div id="recurringModal" class="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-5 space-y-4 text-xs shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <h3 id="recurringModalTitle" class="font-bold text-slate-900 text-sm">年払い・固定費の登録</h3>
+        <button onclick="closeModal('recurringModal')" class="text-slate-400 hover:text-slate-700 text-base">✕</button>
       </div>
-      <form onsubmit="handleCreateRecurring(event)" class="space-y-3">
+      <form onsubmit="handleSaveRecurring(event)" class="space-y-3">
+        <input type="hidden" id="editingRecurringId" value="">
         <div>
-          <label class="text-slate-400 block mb-1">項目の名称</label>
-          <input type="text" id="recNameInput" required placeholder="例: 自動車税、カード年会費" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200">
+          <label class="text-slate-600 block mb-1 font-medium">項目の名称</label>
+          <input type="text" id="recNameInput" required placeholder="例: Amazonプライム年払い、自動車税" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
         </div>
+
+        <div>
+          <label class="text-slate-600 block mb-1 font-medium">支払元（カード / 口座）</label>
+          <select id="recSourceSelect" onchange="updateRecurringRulePreview()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500"></select>
+        </div>
+
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="text-slate-400 block mb-1">頻度</label>
-            <select id="recFreqSelect" onchange="toggleTargetMonth()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200">
+            <label class="text-slate-600 block mb-1 font-medium">支払い頻度</label>
+            <select id="recFreqSelect" onchange="toggleTargetMonth(); updateRecurringRulePreview();" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
               <option value="YEARLY">年払い (年1回)</option>
               <option value="MONTHLY">毎月固定</option>
             </select>
           </div>
-          <div id="targetMonthWrapper">
-            <label class="text-slate-400 block mb-1">引き落とし月</label>
-            <select id="recMonthSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200">
-              <option value="1">毎年 1月</option><option value="2">毎年 2月</option><option value="3">毎年 3月</option>
-              <option value="4">毎年 4月</option><option value="5">毎年 5月</option><option value="6">毎年 6月</option>
-              <option value="7">毎年 7月</option><option value="8">毎年 8月</option><option value="9">毎年 9月</option>
-              <option value="10" selected>毎年 10月</option><option value="11">毎年 11月</option><option value="12">毎年 12月</option>
-            </select>
+          <div>
+            <label class="text-slate-600 block mb-1 font-medium">金額 (円)</label>
+            <input type="number" id="recAmountInput" required placeholder="5900" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="text-slate-400 block mb-1">金額 (円)</label>
-            <input type="number" id="recAmountInput" required placeholder="39500" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200">
+
+        <!-- 請求・利用日設定 -->
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+          <label class="text-slate-700 block font-semibold text-[11px]">請求・利用のタイミング（発生日）</label>
+          <div class="grid grid-cols-2 gap-2">
+            <div id="targetMonthWrapper">
+              <label class="text-slate-500 block mb-0.5 text-[10px]">利用・請求月</label>
+              <select id="recMonthSelect" onchange="updateRecurringRulePreview()" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
+                <option value="1">毎年 1月</option><option value="2">毎年 2月</option><option value="3">毎年 3月</option>
+                <option value="4">毎年 4月</option><option value="5">毎年 5月</option><option value="6">毎年 6月</option>
+                <option value="7">毎年 7月</option><option value="8">毎年 8月</option><option value="9" selected>毎年 9月</option>
+                <option value="10">毎年 10月</option><option value="11">毎年 11月</option><option value="12">毎年 12月</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-slate-500 block mb-0.5 text-[10px]">利用・請求日</label>
+              <select id="recDaySelect" onchange="updateRecurringRulePreview()" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500"></select>
+            </div>
           </div>
-          <div>
-            <label class="text-slate-400 block mb-1">引き落とし元</label>
-            <select id="recSourceSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200"></select>
+
+          <div class="text-[11px] text-amber-900 bg-amber-50 p-2 rounded-lg border border-amber-200 flex items-start gap-1.5 mt-1">
+            <span class="shrink-0">💡</span>
+            <span id="recurringRulePreviewText">毎年 9月20日利用 ➔ 10月27日引落</span>
           </div>
         </div>
+
         <div class="pt-2 flex gap-2">
-          <button type="button" onclick="closeModal('recurringModal')" class="flex-1 py-2 bg-slate-800 rounded-lg text-slate-300">閉じる</button>
-          <button type="submit" class="flex-1 py-2 bg-amber-600 font-bold rounded-lg text-white shadow">登録</button>
+          <button type="button" onclick="closeModal('recurringModal')" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg">閉じる</button>
+          <button type="submit" id="recurringSubmitBtn" class="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 font-bold rounded-lg text-white shadow-sm">登録</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- モーダル: カード・口座追加 -->
-  <div id="sourceModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-4 text-xs">
-      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-        <h3 class="font-bold text-slate-100 text-sm">カード / 銀行口座の追加</h3>
-        <button onclick="closeModal('sourceModal')" class="text-slate-400 hover:text-white">✕</button>
+  <!-- モーダル: カード・口座追加/編集 -->
+  <div id="sourceModal" class="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-5 space-y-4 text-xs shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <h3 id="sourceModalTitle" class="font-bold text-slate-900 text-sm">カード / 銀行口座の追加</h3>
+        <button onclick="closeModal('sourceModal')" class="text-slate-400 hover:text-slate-700 text-base">✕</button>
       </div>
-      <form onsubmit="handleCreateSource(event)" class="space-y-3">
+      <form onsubmit="handleSaveSource(event)" class="space-y-3">
+        <input type="hidden" id="editingSourceId" value="">
         <div>
-          <label class="text-slate-400 block mb-1">種別</label>
+          <label class="text-slate-600 block mb-1 font-medium">種別</label>
           <div class="grid grid-cols-2 gap-2">
-            <button type="button" id="btnTypeCredit" onclick="setSourceType('CREDIT')" class="py-1.5 font-bold rounded border bg-indigo-600 border-indigo-500 text-white">クレカ</button>
-            <button type="button" id="btnTypeBank" onclick="setSourceType('BANK_DIRECT')" class="py-1.5 font-bold rounded border bg-slate-800 border-slate-700 text-slate-400">銀行振替</button>
+            <button type="button" id="btnTypeCredit" onclick="setSourceType('CREDIT')" class="py-1.5 font-bold rounded-lg border bg-indigo-600 border-indigo-600 text-white">クレカ</button>
+            <button type="button" id="btnTypeBank" onclick="setSourceType('BANK_DIRECT')" class="py-1.5 font-bold rounded-lg border bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200">銀行振替</button>
           </div>
         </div>
         <div>
-          <label class="text-slate-400 block mb-1">名前・銀行名</label>
-          <input type="text" id="srcNameInput" required placeholder="例: エポスカード / 三菱UFJ" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200">
+          <label class="text-slate-600 block mb-1 font-medium">名前・銀行名</label>
+          <input type="text" id="srcNameInput" required placeholder="例: 楽天カード / 三井住友カード" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
         </div>
-        <div id="creditRuleInputs" class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="text-slate-400 block mb-1">締め日</label>
-            <select id="srcClosingSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200">
-              <option value="10">10日締め</option>
-              <option value="15" selected>15日締め</option>
-              <option value="20">20日締め</option>
-              <option value="99">月末締め</option>
-            </select>
+
+        <div id="creditRuleInputs" class="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-slate-700 block mb-1 font-semibold">締め日</label>
+              <select id="srcClosingSelect" onchange="updateCreditRulePreview()" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-800 text-xs focus:outline-none focus:border-indigo-500"></select>
+            </div>
+            <div>
+              <label class="text-slate-700 block mb-1 font-semibold">支払タイミング</label>
+              <select id="srcPaymentOffsetSelect" onchange="updateCreditRulePreview()" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
+                <option value="1" selected>翌月払い (標準)</option>
+                <option value="2">翌々月払い</option>
+                <option value="0">当月払い</option>
+              </select>
+            </div>
           </div>
           <div>
-            <label class="text-slate-400 block mb-1">支払日</label>
-            <select id="srcPaymentSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200">
-              <option value="4">翌月 4日</option>
-              <option value="10" selected>翌月 10日</option>
-              <option value="26">翌月 26日</option>
-              <option value="27">翌月 27日</option>
-            </select>
+            <label class="text-slate-700 block mb-1 font-semibold">引き落とし日（支払日）</label>
+            <select id="srcPaymentSelect" onchange="updateCreditRulePreview()" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-800 text-xs focus:outline-none focus:border-indigo-500"></select>
+          </div>
+          <div class="text-[11px] text-indigo-700 bg-indigo-50 p-2 rounded-lg border border-indigo-100 flex items-center gap-1.5">
+            <span>ℹ️</span>
+            <span id="creditRulePreviewText">毎月 15 日締め 翌月 10 日払い</span>
           </div>
         </div>
-        <div id="bankRuleInputs" class="hidden">
-          <label class="text-slate-400 block mb-1">毎月の振替日（引き落とし日）</label>
-          <select id="srcBankPaySelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200"></select>
+
+        <div id="bankRuleInputs" class="hidden p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <label class="text-slate-700 block mb-1 font-semibold">毎月の振替日（引き落とし日）</label>
+          <select id="srcBankPaySelect" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-800 text-xs focus:outline-none focus:border-indigo-500"></select>
         </div>
+
         <div class="pt-2 flex gap-2">
-          <button type="button" onclick="closeModal('sourceModal')" class="flex-1 py-2 bg-slate-800 rounded-lg text-slate-300">閉じる</button>
-          <button type="submit" class="flex-1 py-2 bg-indigo-600 font-bold rounded-lg text-white shadow">追加</button>
+          <button type="button" onclick="closeModal('sourceModal')" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg">閉じる</button>
+          <button type="submit" id="sourceSubmitBtn" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 font-bold rounded-lg text-white shadow-sm">追加</button>
         </div>
       </form>
     </div>
   </div>
 
   <script>
-    const STORAGE_KEY = "money_manager_data_v1";
+    const STORAGE_KEY = "moneymoney_app_data_v1";
 
     let currentMonth = "2026-10";
     let selectedSourceType = "CREDIT";
-    let localFileHandle = null; // ローカル同期対象のファイルハンドル
 
     const defaultData = {
       sources: [
-        { id: "s-1", name: "三井住友カード (NL)", type: "CREDIT", closingDay: 15, paymentDay: 10 },
-        { id: "s-2", name: "楽天カード", type: "CREDIT", closingDay: 99, paymentDay: 27 },
-        { id: "s-3", name: "三菱UFJ銀行 (口座振替)", type: "BANK_DIRECT", closingDay: 0, paymentDay: 25 }
+        { id: "s-1", name: "三井住友カード (NL)", type: "CREDIT", closingDay: 15, paymentMonthOffset: 1, paymentDay: 10 },
+        { id: "s-2", name: "楽天カード", type: "CREDIT", closingDay: 99, paymentMonthOffset: 1, paymentDay: 27 },
+        { id: "s-3", name: "三菱UFJ銀行 (口座振替)", type: "BANK_DIRECT", closingDay: 0, paymentMonthOffset: 0, paymentDay: 25 }
       ],
       expenses: [
         { id: "e-1", sourceId: "s-1", date: "2026-08-20", amount: 6200, memo: "スーパー食材まとめ買い" },
@@ -313,9 +325,9 @@
         { id: "e-5", sourceId: "s-3", date: "2026-10-25", amount: 8900, memo: "水道・光熱費" }
       ],
       recurringList: [
-        { id: "r-1", name: "楽天ゴールド 年会費", amount: 11000, frequency: "YEARLY", targetMonth: 10, sourceId: "s-2" },
-        { id: "r-2", name: "Amazonプライム (年払い)", amount: 5900, frequency: "YEARLY", targetMonth: 10, sourceId: "s-1" },
-        { id: "r-3", name: "自動車税", amount: 39500, frequency: "YEARLY", targetMonth: 5, sourceId: "s-3" }
+        { id: "r-1", name: "楽天ゴールド 年会費", amount: 11000, frequency: "YEARLY", targetMonth: 9, targetDay: 20, sourceId: "s-2" },
+        { id: "r-2", name: "Amazonプライム (年払い)", amount: 5900, frequency: "YEARLY", targetMonth: 9, targetDay: 5, sourceId: "s-1" },
+        { id: "r-3", name: "自動車税", amount: 39500, frequency: "YEARLY", targetMonth: 5, targetDay: 10, sourceId: "s-3" }
       ]
     };
 
@@ -323,9 +335,8 @@
     let expenses = [];
     let recurringList = [];
 
-    // --- トースト通知 ---
     let toastTimeout = null;
-    function showSaveToast(message) {
+    function showSaveToast(message = "ブラウザに自動保存しました") {
       const toast = document.getElementById("saveToast");
       const toastText = document.getElementById("saveToastText");
       if (!toast || !toastText) return;
@@ -336,20 +347,26 @@
       toastTimeout = setTimeout(() => {
         toast.classList.remove("opacity-100", "translate-y-0");
         toast.classList.add("opacity-0", "translate-y-2");
-      }, 2000);
+      }, 1500);
     }
 
-    // --- ローカルストレージ読込 ---
     function loadFromLocalStorage() {
       let isLoaded = false;
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
+        const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("money_manager_data_v1");
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && Array.isArray(parsed.sources)) {
-            sources = parsed.sources;
+            sources = parsed.sources.map(s => ({
+              ...s,
+              paymentMonthOffset: typeof s.paymentMonthOffset === 'number' ? s.paymentMonthOffset : (s.type === 'CREDIT' ? 1 : 0)
+            }));
             expenses = parsed.expenses || [];
-            recurringList = parsed.recurringList || [];
+            recurringList = (parsed.recurringList || []).map(r => ({
+              ...r,
+              targetMonth: typeof r.targetMonth === 'number' ? r.targetMonth : 9,
+              targetDay: typeof r.targetDay === 'number' ? r.targetDay : 10
+            }));
             isLoaded = true;
           }
         }
@@ -365,108 +382,25 @@
       }
     }
 
-    // --- データ保存（ローカルストレージ ＋ 同期中のファイルへ自動上書き） ---
-    async function saveData(showToast = true) {
-      const now = new Date();
-      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    function saveData(showToast = true) {
       const payload = {
-        version: "1.0",
-        lastSaved: now.toISOString(),
+        version: "1.2",
+        lastSaved: new Date().toISOString(),
         sources,
         expenses,
         recurringList
       };
-      const jsonStr = JSON.stringify(payload, null, 2);
 
-      // 1. ブラウザ内保存
       try {
-        localStorage.setItem(STORAGE_KEY, jsonStr);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        if (showToast) {
+          showSaveToast("自動保存しました");
+        }
       } catch (err) {
         console.error("LocalStorage保存失敗:", err);
       }
-
-      // 2. ローカルファイルへの自動上書き保存
-      if (localFileHandle) {
-        try {
-          const writable = await localFileHandle.createWritable();
-          await writable.write(jsonStr);
-          await writable.close();
-          if (showToast) {
-            showSaveToast(`📄 PCファイル [${localFileHandle.name}] へ自動保存済 (${timeStr})`);
-          }
-          return;
-        } catch (err) {
-          console.warn("ファイルへの自動保存に失敗しました:", err);
-          updateSyncUI(false);
-        }
-      }
-
-      if (showToast) {
-        showSaveToast(`ブラウザに自動保存しました (${timeStr})`);
-      }
     }
 
-    // --- ローカル同期ボタン押下時の処理 ---
-    async function handleSyncButtonClick() {
-      // プレビュー枠（iframe内）かどうかの判定
-      const isInsideIframe = window.self !== window.top;
-
-      if (isInsideIframe) {
-        alert(
-          "【PCファイルへの自動同期について】\n\n" +
-          "チャットのプレビュー画面（iframe）の中からは、ブラウザのセキュリティ制限によりPCのファイルへ直接アクセスできません。\n\n" +
-          "【PCのファイルへ自動保存する手順】\n" +
-          "1. 右側のコード枠から「index.html」をパソコンに保存します。\n" +
-          "2. 保存した「index.html」をダブルクリックしてブラウザ（Chrome / Edge 等）で開きます。\n" +
-          "3. 画面右上の「📁 ローカルファイルと同期」を押してPC上の保存ファイル（例: data.json）を指定すると、完全自動保存が有効になります！"
-        );
-        return;
-      }
-
-      if (!("showSaveFilePicker" in window) && !("showOpenFilePicker" in window)) {
-        alert("お使いのブラウザはローカルファイルとの直接自動同期に対応していません。Google ChromeまたはMicrosoft Edgeをご利用ください。");
-        return;
-      }
-
-      try {
-        // 保存先ファイルを指定（新規作成または既存ファイル選択）
-        localFileHandle = await window.showSaveFilePicker({
-          suggestedName: "money_manager_data.json",
-          types: [{
-            description: "マネーマネージャー データファイル (*.json)",
-            accept: { "application/json": [".json"] }
-          }]
-        });
-
-        // 選択されたファイルへ即座に現在のデータを上書き保存
-        await saveData(false);
-        updateSyncUI(true, localFileHandle.name);
-        alert(`ファイル「${localFileHandle.name}」と接続しました！\n今後、明細の追加や変更を行うたびに、このファイルへ自動で上書き保存されます。`);
-      } catch (err) {
-        if (err.name === "AbortError") return;
-        console.error("ファイル同期エラー:", err);
-        alert("ファイルの指定に失敗しました。");
-      }
-    }
-
-    // --- 同期状態のUI更新 ---
-    function updateSyncUI(isConnected, filename = "") {
-      const dot = document.getElementById("syncDot");
-      const btnText = document.getElementById("syncBtnText");
-      const bannerMsg = document.getElementById("syncBannerMessage");
-
-      if (isConnected && filename) {
-        dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block";
-        btnText.innerText = `🟢 同期中: ${filename}`;
-        bannerMsg.innerText = `現在、PC上のファイル「${filename}」と自動同期中です。変更は即座にファイルへ上書き保存されます。`;
-      } else {
-        dot.className = "w-2 h-2 rounded-full bg-slate-500 inline-block";
-        btnText.innerText = `📁 ローカルファイルと同期`;
-        bannerMsg.innerText = `「📁 ローカルファイルと同期」を押してPC内のファイル（例: money_data.json）を指定すると、入力のたびにそのファイルへ自動で上書き保存されます。`;
-      }
-    }
-
-    // --- 初期サンプルデータに戻す ---
     function resetToDefaultData() {
       if (!confirm("すべてのデータを初期のサンプル状態にリセットしますか？\n（現在の入力内容は消去されます）")) return;
       sources = JSON.parse(JSON.stringify(defaultData.sources));
@@ -476,17 +410,16 @@
       render();
     }
 
-    // --- 手動ファイルダウンロード（バックアップ） ---
     function exportDataToFile() {
       const dataStr = JSON.stringify({
-        version: "1.0",
+        version: "1.2",
         exportedAt: new Date().toISOString(),
         sources,
         expenses,
         recurringList
       }, null, 2);
 
-      const defaultFilename = `money_manager_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      const defaultFilename = `MoneyMoney_backup_${new Date().toISOString().slice(0, 10)}.json`;
       const blob = new Blob([dataStr], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -499,7 +432,6 @@
       showSaveToast("JSONバックアップファイルを保存しました");
     }
 
-    // --- JSONファイル読み込み復元 ---
     function loadFromFile(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -509,13 +441,20 @@
         try {
           const parsed = JSON.parse(e.target.result);
           if (!parsed.sources || !Array.isArray(parsed.sources)) {
-            alert("マネーマネージャーの有効なデータファイルではありません。");
+            alert("MoneyMoneyの有効なデータファイルではありません。");
             return;
           }
           if (confirm("選択したファイルの内容で復元しますか？（現在のデータは上書きされます）")) {
-            sources = parsed.sources || [];
+            sources = (parsed.sources || []).map(s => ({
+              ...s,
+              paymentMonthOffset: typeof s.paymentMonthOffset === 'number' ? s.paymentMonthOffset : (s.type === 'CREDIT' ? 1 : 0)
+            }));
             expenses = parsed.expenses || [];
-            recurringList = parsed.recurringList || [];
+            recurringList = (parsed.recurringList || []).map(r => ({
+              ...r,
+              targetMonth: typeof r.targetMonth === 'number' ? r.targetMonth : 9,
+              targetDay: typeof r.targetDay === 'number' ? r.targetDay : 10
+            }));
             saveData(true);
             render();
             alert("データを正常に復元しました！");
@@ -534,22 +473,242 @@
 
       if (source.type === "BANK_DIRECT") {
         const pMonth = `${y}-${String(m).padStart(2, '0')}`;
-        return { payMonth: pMonth, payDate: `${pMonth}-${String(source.paymentDay).padStart(2, '0')}` };
+        const lastDayOfM = new Date(y, m, 0).getDate();
+        const payDay = source.paymentDay === 99 ? lastDayOfM : Math.min(source.paymentDay || d, lastDayOfM);
+        return { payMonth: pMonth, payDate: `${pMonth}-${String(payDay).padStart(2, '0')}` };
       }
 
       let closeY = y;
       let closeM = m - 1;
+
       if (source.closingDay !== 99 && d > source.closingDay) {
         closeM += 1;
-        if (closeM > 11) { closeM = 0; closeY += 1; }
+        if (closeM > 11) {
+          closeM = 0;
+          closeY += 1;
+        }
       }
 
+      const offset = typeof source.paymentMonthOffset === 'number' ? source.paymentMonthOffset : 1;
       let pY = closeY;
-      let pM = closeM + 1;
-      if (pM > 11) { pM = 0; pY += 1; }
+      let pM = closeM + offset;
+
+      while (pM > 11) {
+        pM -= 12;
+        pY += 1;
+      }
+      while (pM < 0) {
+        pM += 12;
+        pY -= 1;
+      }
+
+      const lastDayOfPayMonth = new Date(pY, pM + 1, 0).getDate();
+      const actualPayDay = source.paymentDay === 99 ? lastDayOfPayMonth : Math.min(source.paymentDay, lastDayOfPayMonth);
 
       const pMonth = `${pY}-${String(pM + 1).padStart(2, '0')}`;
-      return { payMonth: pMonth, payDate: `${pMonth}-${String(source.paymentDay).padStart(2, '0')}` };
+      return { payMonth: pMonth, payDate: `${pMonth}-${String(actualPayDay).padStart(2, '0')}` };
+    }
+
+    function getRecurringDueDateInfo(recurringItem, source, targetYear) {
+      if (!source) return { payMonth: "", payDate: "", useDateStr: "" };
+
+      const year = targetYear || Number(currentMonth.split("-")[0]);
+      const month = recurringItem.targetMonth || 1;
+      const lastDayOfMonth = new Date(year, month, 0).getDate();
+      const day = recurringItem.targetDay === 99 ? lastDayOfMonth : Math.min(recurringItem.targetDay || 1, lastDayOfMonth);
+
+      const useDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dueInfo = calculateDueDate(useDateStr, source);
+
+      return {
+        ...dueInfo,
+        useDateStr,
+        useMonth: month,
+        useDay: day
+      };
+    }
+
+    function openExpenseModalWithSource(sourceId = null) {
+      const select = document.getElementById("expSourceSelect");
+      if (sourceId && select) {
+        select.value = sourceId;
+      }
+      openModal('expenseModal');
+    }
+
+    function updateRecurringRulePreview() {
+      const sourceId = document.getElementById("recSourceSelect").value;
+      const source = sources.find(s => s.id === sourceId);
+      const frequency = document.getElementById("recFreqSelect").value;
+      const targetMonth = Number(document.getElementById("recMonthSelect").value);
+      const targetDay = Number(document.getElementById("recDaySelect").value);
+
+      const previewEl = document.getElementById("recurringRulePreviewText");
+      if (!source || !previewEl) return;
+
+      const [curY] = currentMonth.split("-").map(Number);
+      const dayText = targetDay === 99 ? '末日' : `${targetDay}日`;
+
+      if (frequency === "YEARLY") {
+        const dummyItem = { targetMonth, targetDay, frequency, sourceId };
+        const dueInfo = getRecurringDueDateInfo(dummyItem, source, curY);
+        const [payY, payM] = dueInfo.payMonth.split("-");
+        const payD = dueInfo.payDate.split("-")[2];
+
+        if (source.type === "CREDIT") {
+          previewEl.innerText = `毎年 ${targetMonth}月${dayText}利用 ➔ 【${Number(payM)}月${Number(payD)}日引落】(${source.name}の締め日/支払日を自動適用)`;
+        } else {
+          previewEl.innerText = `毎年 ${targetMonth}月${dayText}発生 ➔ 【${Number(payM)}月${Number(payD)}日引落】(${source.name})`;
+        }
+      } else {
+        const dummyItem = { targetMonth: Number(currentMonth.split("-")[1]), targetDay, frequency, sourceId };
+        const dueInfo = getRecurringDueDateInfo(dummyItem, source, curY);
+        const [payY, payM] = dueInfo.payMonth.split("-");
+        const payD = dueInfo.payDate.split("-")[2];
+
+        previewEl.innerText = `毎月 ${dayText}利用 ➔ 毎月 ${Number(payD)}日頃引落 (${source.name})`;
+      }
+    }
+
+    function openCreateRecurringModal() {
+      document.getElementById("recurringModalTitle").innerText = "年払い・固定費の登録";
+      document.getElementById("recurringSubmitBtn").innerText = "登録";
+      document.getElementById("editingRecurringId").value = "";
+      document.getElementById("recNameInput").value = "";
+      document.getElementById("recFreqSelect").value = "YEARLY";
+      document.getElementById("recMonthSelect").value = "9";
+      document.getElementById("recDaySelect").value = "20";
+      document.getElementById("recAmountInput").value = "";
+      if (sources.length > 0) {
+        document.getElementById("recSourceSelect").value = sources[0].id;
+      }
+      toggleTargetMonth();
+      updateRecurringRulePreview();
+      openModal("recurringModal");
+    }
+
+    function openEditRecurringModal(id) {
+      const item = recurringList.find(r => r.id === id);
+      if (!item) return;
+
+      document.getElementById("recurringModalTitle").innerText = "年払い・固定費の編集";
+      document.getElementById("recurringSubmitBtn").innerText = "更新する";
+      document.getElementById("editingRecurringId").value = item.id;
+      document.getElementById("recNameInput").value = item.name;
+      document.getElementById("recFreqSelect").value = item.frequency;
+      document.getElementById("recMonthSelect").value = String(item.targetMonth || 9);
+      document.getElementById("recDaySelect").value = String(item.targetDay || 20);
+      document.getElementById("recAmountInput").value = item.amount;
+      document.getElementById("recSourceSelect").value = item.sourceId;
+      toggleTargetMonth();
+      updateRecurringRulePreview();
+      openModal("recurringModal");
+    }
+
+    function handleSaveRecurring(e) {
+      e.preventDefault();
+      const editId = document.getElementById("editingRecurringId").value;
+      const name = document.getElementById("recNameInput").value.trim();
+      const frequency = document.getElementById("recFreqSelect").value;
+      const targetMonth = Number(document.getElementById("recMonthSelect").value);
+      const targetDay = Number(document.getElementById("recDaySelect").value);
+      const amount = Number(document.getElementById("recAmountInput").value);
+      const sourceId = document.getElementById("recSourceSelect").value;
+
+      if (!name || isNaN(amount) || amount <= 0) {
+        alert("正しい名称と金額を入力してください。");
+        return;
+      }
+
+      if (editId) {
+        const index = recurringList.findIndex(r => r.id === editId);
+        if (index !== -1) {
+          recurringList[index] = { ...recurringList[index], name, frequency, targetMonth, targetDay, amount, sourceId };
+        }
+      } else {
+        recurringList.push({ id: "r-" + Date.now(), name, frequency, targetMonth, targetDay, amount, sourceId });
+      }
+
+      saveData(true);
+      closeModal("recurringModal");
+      render();
+    }
+
+    function updateCreditRulePreview() {
+      const closingDay = Number(document.getElementById("srcClosingSelect").value);
+      const offset = Number(document.getElementById("srcPaymentOffsetSelect").value);
+      const paymentDay = Number(document.getElementById("srcPaymentSelect").value);
+
+      const closeText = closingDay === 99 ? '月末' : `${closingDay} 日`;
+      const offsetText = offset === 1 ? '翌月' : (offset === 2 ? '翌々月' : '当月');
+      const payText = paymentDay === 99 ? '末日' : `${paymentDay} 日`;
+
+      const previewEl = document.getElementById("creditRulePreviewText");
+      if (previewEl) {
+        previewEl.innerText = `毎月 ${closeText} 締め ${offsetText} ${payText} 払い`;
+      }
+    }
+
+    function openCreateSourceModal() {
+      document.getElementById("sourceModalTitle").innerText = "カード / 銀行口座の追加";
+      document.getElementById("sourceSubmitBtn").innerText = "追加";
+      document.getElementById("editingSourceId").value = "";
+      document.getElementById("srcNameInput").value = "";
+      document.getElementById("srcClosingSelect").value = "15";
+      document.getElementById("srcPaymentOffsetSelect").value = "1";
+      document.getElementById("srcPaymentSelect").value = "10";
+      document.getElementById("srcBankPaySelect").value = "25";
+      setSourceType("CREDIT");
+      updateCreditRulePreview();
+      openModal("sourceModal");
+    }
+
+    function openEditSourceModal(id) {
+      const src = sources.find(s => s.id === id);
+      if (!src) return;
+
+      document.getElementById("sourceModalTitle").innerText = "カード / 銀行口座の編集";
+      document.getElementById("sourceSubmitBtn").innerText = "更新する";
+      document.getElementById("editingSourceId").value = src.id;
+      document.getElementById("srcNameInput").value = src.name;
+      setSourceType(src.type);
+
+      if (src.type === "CREDIT") {
+        document.getElementById("srcClosingSelect").value = String(src.closingDay);
+        document.getElementById("srcPaymentOffsetSelect").value = String(typeof src.paymentMonthOffset === 'number' ? src.paymentMonthOffset : 1);
+        document.getElementById("srcPaymentSelect").value = String(src.paymentDay);
+        updateCreditRulePreview();
+      } else {
+        document.getElementById("srcBankPaySelect").value = String(src.paymentDay);
+      }
+      openModal("sourceModal");
+    }
+
+    function handleSaveSource(e) {
+      e.preventDefault();
+      const editId = document.getElementById("editingSourceId").value;
+      const name = document.getElementById("srcNameInput").value.trim();
+      const closingDay = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcClosingSelect").value) : 0;
+      const paymentMonthOffset = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcPaymentOffsetSelect").value) : 0;
+      const paymentDay = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcPaymentSelect").value) : Number(document.getElementById("srcBankPaySelect").value);
+
+      if (!name) {
+        alert("名前・銀行名を入力してください。");
+        return;
+      }
+
+      if (editId) {
+        const index = sources.findIndex(s => s.id === editId);
+        if (index !== -1) {
+          sources[index] = { ...sources[index], name, type: selectedSourceType, closingDay, paymentMonthOffset, paymentDay };
+        }
+      } else {
+        sources.push({ id: "s-" + Date.now(), name, type: selectedSourceType, closingDay, paymentMonthOffset, paymentDay });
+      }
+
+      saveData(true);
+      closeModal("sourceModal");
+      render();
     }
 
     function render() {
@@ -562,9 +721,45 @@
         return { ...e, payMonth, payDate, srcName: src ? src.name : "不明" };
       }).filter(e => e.payMonth === currentMonth);
 
-      const currentRecurring = recurringList.filter(r => {
-        if (r.frequency === "MONTHLY") return true;
-        return r.frequency === "YEARLY" && r.targetMonth === month;
+      const currentRecurring = [];
+      recurringList.forEach(r => {
+        const src = sources.find(s => s.id === r.sourceId);
+        if (!src) return;
+
+        if (r.frequency === "YEARLY") {
+          [-1, 0, 1].forEach(offsetYear => {
+            const checkYear = year + offsetYear;
+            const dueInfo = getRecurringDueDateInfo(r, src, checkYear);
+            if (dueInfo.payMonth === currentMonth) {
+              currentRecurring.push({
+                ...r,
+                payMonth: dueInfo.payMonth,
+                payDate: dueInfo.payDate,
+                useDateStr: dueInfo.useDateStr,
+                useMonth: dueInfo.useMonth,
+                useDay: dueInfo.useDay
+              });
+            }
+          });
+        } else if (r.frequency === "MONTHLY") {
+          [-1, 0, 1].forEach(offsetMonth => {
+            const d = new Date(year, month - 1 + offsetMonth, 1);
+            const checkYear = d.getFullYear();
+            const checkMonth = d.getMonth() + 1;
+            const dummyItem = { ...r, targetMonth: checkMonth };
+            const dueInfo = getRecurringDueDateInfo(dummyItem, src, checkYear);
+            if (dueInfo.payMonth === currentMonth) {
+              currentRecurring.push({
+                ...r,
+                payMonth: dueInfo.payMonth,
+                payDate: dueInfo.payDate,
+                useDateStr: dueInfo.useDateStr,
+                useMonth: dueInfo.useMonth,
+                useDay: dueInfo.useDay
+              });
+            }
+          });
+        }
       });
 
       const regularTotal = currentExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
@@ -577,7 +772,7 @@
 
       const sortedSources = [...sources].sort((a, b) => a.paymentDay - b.paymentDay);
 
-      // 上部カード別引き落とし日表示
+      // 上部カード別引き落とし日
       const topDueContainer = document.getElementById("topSourceDueList");
       topDueContainer.innerHTML = sortedSources.map(src => {
         const cardExpenses = currentExpenses.filter(e => e.sourceId === src.id);
@@ -585,24 +780,27 @@
         const total = cardExpenses.reduce((sum, e) => sum + Number(e.amount), 0) +
                       cardRecs.reduce((sum, r) => sum + Number(r.amount), 0);
 
+        const lastDayOfCurMonth = new Date(year, month, 0).getDate();
+        const displayDay = src.paymentDay === 99 ? lastDayOfCurMonth : src.paymentDay;
+
         return `
-          <div class="bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+          <div class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 shadow-sm">
             <div class="min-w-0">
               <div class="flex items-center gap-1.5">
-                <span class="text-[11px] font-bold text-amber-300 font-mono">
-                  ${month}月${src.paymentDay}日
+                <span class="text-[11px] font-bold text-slate-800 font-mono">
+                  ${month}月${displayDay}日
                 </span>
-                <span class="text-[10px] px-1.5 py-0.2 rounded font-medium ${src.type === 'CREDIT' ? 'bg-indigo-900/60 text-indigo-300' : 'bg-teal-900/60 text-teal-300'}">
+                <span class="text-[10px] px-1.5 py-0.2 rounded font-semibold ${src.type === 'CREDIT' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-teal-50 text-teal-700 border border-teal-200'}">
                   ${src.type === 'CREDIT' ? 'クレカ' : '振替'}
                 </span>
               </div>
-              <div class="text-xs font-semibold text-slate-200 truncate mt-0.5">
+              <div class="text-xs font-semibold text-slate-700 truncate mt-0.5">
                 ${src.name}
               </div>
             </div>
             <div class="text-right shrink-0">
               <span class="text-[10px] text-slate-400 block">引落額</span>
-              <span class="text-sm font-bold text-emerald-400">¥${total.toLocaleString()}</span>
+              <span class="text-sm font-bold text-slate-900">¥${total.toLocaleString()}</span>
             </div>
           </div>
         `;
@@ -613,86 +811,188 @@
       if (currentRecurring.length > 0) {
         alertBox.classList.remove("hidden");
         document.getElementById("recurringAlertText").innerText =
-          `今月は ${currentRecurring.map(r => `${r.name} (¥${r.amount.toLocaleString()})`).join("、 ")} の引き落としがあります。`;
+          `今月はカード締め日・支払日計算に基づき、${currentRecurring.map(r => `${r.name} (¥${r.amount.toLocaleString()})`).join("、 ")} の引き落としが予定されています。`;
       } else {
         alertBox.classList.add("hidden");
       }
 
-      // タブ1: 口座別サマリー
-      const summaryContainer = document.getElementById("tabContent-summary");
-      summaryContainer.innerHTML = sortedSources.map(src => {
-        const cardExpenses = currentExpenses.filter(e => e.sourceId === src.id);
-        const cardRecs = currentRecurring.filter(r => r.sourceId === src.id);
-        const regAmt = cardExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-        const recAmt = cardRecs.reduce((sum, r) => sum + Number(r.amount), 0);
-        const total = regAmt + recAmt;
-
-        return `
-          <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
-            <div>
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-[10px] px-2 py-0.5 rounded font-bold ${src.type === 'CREDIT' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-teal-500/20 text-teal-300'}">
-                  ${src.type === 'CREDIT' ? 'クレジットカード' : '銀行振替'}
-                </span>
-                <span class="text-[11px] text-amber-300 font-bold bg-amber-950/30 px-2 py-0.5 rounded border border-amber-500/30">
-                  ${month}月${src.paymentDay}日引落
-                </span>
-              </div>
-              <h3 class="font-bold text-slate-200 text-sm mt-1">${src.name}</h3>
-              <p class="text-[11px] text-slate-500 mt-0.5">
-                ${src.type === 'CREDIT' ? `締め日: ${src.closingDay === 99 ? '月末' : src.closingDay + '日'}` : '即時振替口座'}
-              </p>
-            </div>
-            <div class="mt-4 pt-3 border-t border-slate-800 flex justify-between items-baseline">
-              <span class="text-[10px] text-slate-400">引落予定</span>
-              <span class="text-lg font-black text-emerald-400">¥${total.toLocaleString()}</span>
-            </div>
-          </div>
-        `;
-      }).join("");
-
-      // タブ2: 明細テーブル
-      const tbody = document.getElementById("expensesTableBody");
-      if (currentExpenses.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-500">当月の明細はありません</td></tr>`;
+      // タブ1: 利用明細
+      const expensesContainer = document.getElementById("tabContent-expenses");
+      if (sortedSources.length === 0) {
+        expensesContainer.innerHTML = `<div class="bg-white border border-slate-200 rounded-xl p-8 text-center text-xs text-slate-400">カードや口座が登録されていません。下部の「＋ 口座・カードを追加」から設定してください。</div>`;
       } else {
-        tbody.innerHTML = currentExpenses.map(e => `
-          <tr class="hover:bg-slate-800/30">
-            <td class="p-3 text-slate-400">${e.date}</td>
-            <td class="p-3 font-semibold text-slate-200">${e.srcName}</td>
-            <td class="p-3 text-slate-300">${e.memo || '-'}</td>
-            <td class="p-3 text-emerald-400 font-mono">${e.payDate}</td>
-            <td class="p-3 text-right font-bold text-slate-100">¥${Number(e.amount).toLocaleString()}</td>
-            <td class="p-3 text-center">
-              <button onclick="deleteExpense('${e.id}')" class="text-slate-500 hover:text-rose-400">✕</button>
-            </td>
-          </tr>
-        `).join("");
+        expensesContainer.innerHTML = sortedSources.map(src => {
+          const cardExpenses = currentExpenses.filter(e => e.sourceId === src.id);
+          const cardRecs = currentRecurring.filter(r => r.sourceId === src.id);
+          const regAmt = cardExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+          const recAmt = cardRecs.reduce((sum, r) => sum + Number(r.amount), 0);
+          const total = regAmt + recAmt;
+
+          const lastDayOfCurMonth = new Date(year, month, 0).getDate();
+          const displayDay = src.paymentDay === 99 ? lastDayOfCurMonth : src.paymentDay;
+
+          let itemsHtml = "";
+          
+          if (cardExpenses.length > 0) {
+            itemsHtml += cardExpenses.map(e => `
+              <tr class="hover:bg-slate-50 transition">
+                <td class="p-3 text-slate-500 whitespace-nowrap">${e.date}</td>
+                <td class="p-3 text-slate-800 font-medium">${e.memo || '未分類'}</td>
+                <td class="p-3 text-right font-bold text-slate-900 whitespace-nowrap">¥${Number(e.amount).toLocaleString()}</td>
+                <td class="p-3 text-center whitespace-nowrap">
+                  <button onclick="deleteExpense('${e.id}')" title="削除" class="text-slate-400 hover:text-rose-600 font-bold px-2 py-1 rounded hover:bg-slate-100 transition">✕</button>
+                </td>
+              </tr>
+            `).join("");
+          }
+
+          if (cardRecs.length > 0) {
+            itemsHtml += cardRecs.map(r => `
+              <tr class="bg-amber-50/40 hover:bg-amber-50/70 transition">
+                <td class="p-3 text-amber-800 whitespace-nowrap font-medium">
+                  <span class="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-[10px] text-amber-800 border border-amber-300 font-bold mr-1">年払/固定</span>
+                  <span class="text-slate-500 text-[11px]">(${r.useMonth}/${r.useDay}利用分)</span>
+                </td>
+                <td class="p-3 text-amber-900 font-bold">
+                  ${r.name}
+                  <span class="text-[10px] text-amber-700 font-normal ml-1">➔ ${month}/${displayDay} 引落</span>
+                </td>
+                <td class="p-3 text-right font-bold text-amber-800 whitespace-nowrap">¥${Number(r.amount).toLocaleString()}</td>
+                <td class="p-3 text-center text-xs text-slate-400">-</td>
+              </tr>
+            `).join("");
+          }
+
+          const hasItems = cardExpenses.length > 0 || cardRecs.length > 0;
+          const offsetName = (src.paymentMonthOffset === 2) ? '翌々月' : ((src.paymentMonthOffset === 0) ? '当月' : '翌月');
+
+          return `
+            <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <div class="p-4 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-[10px] px-2 py-0.5 rounded font-bold ${src.type === 'CREDIT' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-teal-50 text-teal-700 border border-teal-200'}">
+                    ${src.type === 'CREDIT' ? 'クレジットカード' : '銀行振替'}
+                  </span>
+                  <div>
+                    <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      ${src.name}
+                    </h3>
+                    <p class="text-[11px] text-slate-500 mt-0.5">
+                      ${src.type === 'CREDIT' ? `締め日: <span class="font-medium text-slate-700">${src.closingDay === 99 ? '月末' : src.closingDay + '日'}</span> ｜ ` : ''}引落日: <span class="font-bold text-slate-800">${month}月${displayDay}日</span>
+                      ${src.type === 'CREDIT' ? `<span class="text-slate-400 text-[10px]">(${offsetName}${src.paymentDay === 99 ? '末日' : src.paymentDay + '日'}払い)</span>` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                  <div class="text-right">
+                    <span class="text-[10px] text-slate-400 block">当月引落予定額</span>
+                    <span class="text-lg font-black text-orange-700">¥${total.toLocaleString()}</span>
+                  </div>
+                  <button onclick="openExpenseModalWithSource('${src.id}')" title="このカード・口座に明細を追加" class="px-3 py-2 text-xs font-bold rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition active:scale-95">
+                    ＋ 明細追加
+                  </button>
+                </div>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                    <tr>
+                      <th class="p-3 w-36">利用日 / 区分</th>
+                      <th class="p-3">品目 / メモ</th>
+                      <th class="p-3 text-right w-32">金額</th>
+                      <th class="p-3 text-center w-16">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    ${hasItems ? itemsHtml : `<tr><td colspan="4" class="p-4 text-center text-slate-400 text-xs">当月の利用明細はありません</td></tr>`}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+        }).join("");
       }
 
-      // タブ3: 年払い一覧
-      const recurringContainer = document.getElementById("tabContent-recurring");
-      recurringContainer.innerHTML = recurringList.map(r => {
-        const src = sources.find(s => s.id === r.sourceId);
-        const isHit = r.frequency === "MONTHLY" || (r.frequency === "YEARLY" && r.targetMonth === month);
-        return `
-          <div class="bg-slate-900 border ${isHit ? 'border-amber-500/50 bg-amber-950/10' : 'border-slate-800'} rounded-xl p-4 flex flex-col justify-between">
-            <div>
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-[10px] px-2 py-0.5 rounded font-bold bg-slate-800 text-amber-300 border border-slate-700">
-                  ${r.frequency === 'YEARLY' ? `毎年 ${r.targetMonth} 月` : '毎月固定'}
-                </span>
-                <button onclick="deleteRecurring('${r.id}')" class="text-slate-500 hover:text-rose-400">✕</button>
+      // タブ2: 年払い一覧
+      const recurringContainer = document.getElementById("recurringListContainer");
+      if (recurringContainer) {
+        recurringContainer.innerHTML = recurringList.map(r => {
+          const src = sources.find(s => s.id === r.sourceId);
+          const dueInfo = src ? getRecurringDueDateInfo(r, src, year) : null;
+          const isHit = dueInfo && dueInfo.payMonth === currentMonth;
+          const [pY, pM] = dueInfo ? dueInfo.payMonth.split("-") : ["", ""];
+          const pD = dueInfo ? dueInfo.payDate.split("-")[2] : "";
+
+          return `
+            <div class="bg-white border ${isHit ? 'border-amber-400 ring-2 ring-amber-100 bg-amber-50/20' : 'border-slate-200'} rounded-xl p-4 flex flex-col justify-between shadow-sm">
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                    ${r.frequency === 'YEARLY' ? `毎年 ${r.targetMonth}月${r.targetDay === 99 ? '末日' : r.targetDay + '日'} 利用` : `毎月 ${r.targetDay === 99 ? '末日' : r.targetDay + '日'} 利用`}
+                  </span>
+                  <div class="flex items-center gap-1">
+                    <button onclick="openEditRecurringModal('${r.id}')" title="編集" class="text-slate-400 hover:text-indigo-600 font-medium px-1.5 py-0.5 rounded hover:bg-slate-100 transition">✏️ 編集</button>
+                    <button onclick="deleteRecurring('${r.id}')" title="削除" class="text-slate-400 hover:text-rose-600 font-bold px-1.5 py-0.5 rounded hover:bg-slate-100 transition">✕</button>
+                  </div>
+                </div>
+                <h4 class="font-bold text-slate-900 text-sm mt-1.5">${r.name}</h4>
+                <div class="mt-2 text-[11px] text-slate-600 space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <div>決済: <span class="font-semibold text-slate-800">${src ? src.name : '不明'}</span></div>
+                  <div>引落予定: <span class="font-bold text-amber-800">${pM ? Number(pM) + '月' + Number(pD) + '日' : '-'}</span></div>
+                </div>
               </div>
-              <h4 class="font-bold text-slate-200 text-sm mt-1">${r.name}</h4>
-              <p class="text-[11px] text-slate-500 mt-0.5">引落: ${src ? src.name : '不明'}</p>
+              <div class="mt-3 pt-2 border-t border-slate-100 text-right">
+                <span class="text-base font-black text-amber-700">¥${Number(r.amount).toLocaleString()}</span>
+              </div>
             </div>
-            <div class="mt-4 pt-2 border-t border-slate-800 text-right">
-              <span class="text-base font-black text-amber-400">¥${Number(r.amount).toLocaleString()}</span>
+          `;
+        }).join("");
+      }
+
+      // タブ3: カード・口座管理
+      const sourcesContainer = document.getElementById("sourcesListContainer");
+      if (sourcesContainer) {
+        sourcesContainer.innerHTML = sortedSources.map(src => {
+          const offsetName = (src.paymentMonthOffset === 2) ? '翌々月' : ((src.paymentMonthOffset === 0) ? '当月' : '翌月');
+          const payDayText = src.paymentDay === 99 ? '末日' : `${src.paymentDay} 日`;
+
+          return `
+            <div class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between shadow-sm hover:border-slate-300 transition">
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[10px] px-2 py-0.5 rounded font-bold ${src.type === 'CREDIT' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-teal-50 text-teal-700 border border-teal-200'}">
+                    ${src.type === 'CREDIT' ? 'クレジットカード' : '銀行振替'}
+                  </span>
+                  <div class="flex items-center gap-1">
+                    <button onclick="openEditSourceModal('${src.id}')" title="編集" class="text-slate-400 hover:text-indigo-600 font-medium px-1.5 py-0.5 rounded hover:bg-slate-100 transition">✏️ 編集</button>
+                    <button onclick="deleteSource('${src.id}')" title="削除" class="text-slate-400 hover:text-rose-600 font-bold px-1.5 py-0.5 rounded hover:bg-slate-100 transition">✕</button>
+                  </div>
+                </div>
+                <h3 class="font-bold text-slate-900 text-sm mt-1.5">${src.name}</h3>
+                <div class="mt-2.5 text-xs text-slate-600 space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                  ${src.type === 'CREDIT' ? `
+                    <div class="flex justify-between">
+                      <span class="text-slate-400">締め日:</span>
+                      <span class="font-semibold text-slate-800">毎月 ${src.closingDay === 99 ? '月末' : src.closingDay + ' 日'}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-slate-400">お支払い:</span>
+                      <span class="font-semibold text-indigo-700">${offsetName} ${payDayText} 払い</span>
+                    </div>
+                  ` : `
+                    <div class="flex justify-between">
+                      <span class="text-slate-400">振替日:</span>
+                      <span class="font-semibold text-teal-700">毎月 ${payDayText}</span>
+                    </div>
+                  `}
+                </div>
+              </div>
             </div>
-          </div>
-        `;
-      }).join("");
+          `;
+        }).join("");
+      }
 
       const countEl = document.getElementById("dataCountSummary");
       if (countEl) {
@@ -710,12 +1010,16 @@
     }
 
     function switchTab(tabId) {
-      ['summary', 'expenses', 'recurring'].forEach(id => {
-        document.getElementById(`tabContent-${id}`).classList.add("hidden");
-        document.getElementById(`tabBtn-${id}`).className = "pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200";
+      ['expenses', 'recurring', 'sources'].forEach(id => {
+        const el = document.getElementById(`tabContent-${id}`);
+        const btn = document.getElementById(`tabBtn-${id}`);
+        if (el) el.classList.add("hidden");
+        if (btn) btn.className = "pb-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800";
       });
-      document.getElementById(`tabContent-${tabId}`).classList.remove("hidden");
-      document.getElementById(`tabBtn-${tabId}`).className = "pb-2 border-b-2 border-indigo-500 text-indigo-400";
+      const targetEl = document.getElementById(`tabContent-${tabId}`);
+      const targetBtn = document.getElementById(`tabBtn-${tabId}`);
+      if (targetEl) targetEl.classList.remove("hidden");
+      if (targetBtn) targetBtn.className = "pb-2.5 border-b-2 border-indigo-600 text-indigo-600";
     }
 
     function openModal(id) { document.getElementById(id).classList.remove("hidden"); }
@@ -729,57 +1033,43 @@
       if (recSelect) recSelect.innerHTML = opts;
     }
 
-    async function handleCreateExpense(e) {
+    function handleCreateExpense(e) {
       e.preventDefault();
       const sourceId = document.getElementById("expSourceSelect").value;
       const date = document.getElementById("expDateInput").value;
       const amount = Number(document.getElementById("expAmountInput").value);
       const memo = document.getElementById("expMemoInput").value;
       expenses.unshift({ id: "e-" + Date.now(), sourceId, date, amount, memo });
-      await saveData(true);
+      saveData(true);
       closeModal("expenseModal");
       document.getElementById("expAmountInput").value = "";
       document.getElementById("expMemoInput").value = "";
       render();
     }
 
-    async function handleCreateRecurring(e) {
-      e.preventDefault();
-      const name = document.getElementById("recNameInput").value;
-      const frequency = document.getElementById("recFreqSelect").value;
-      const targetMonth = Number(document.getElementById("recMonthSelect").value);
-      const amount = Number(document.getElementById("recAmountInput").value);
-      const sourceId = document.getElementById("recSourceSelect").value;
-      recurringList.push({ id: "r-" + Date.now(), name, frequency, targetMonth, amount, sourceId });
-      await saveData(true);
-      closeModal("recurringModal");
-      document.getElementById("recNameInput").value = "";
-      document.getElementById("recAmountInput").value = "";
-      render();
-    }
-
-    async function handleCreateSource(e) {
-      e.preventDefault();
-      const name = document.getElementById("srcNameInput").value;
-      const closingDay = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcClosingSelect").value) : 0;
-      const paymentDay = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcPaymentSelect").value) : Number(document.getElementById("srcBankPaySelect").value);
-
-      sources.push({ id: "s-" + Date.now(), name, type: selectedSourceType, closingDay, paymentDay });
-      await saveData(true);
-      closeModal("sourceModal");
-      document.getElementById("srcNameInput").value = "";
-      render();
-    }
-
-    async function deleteExpense(id) {
+    function deleteExpense(id) {
       expenses = expenses.filter(e => e.id !== id);
-      await saveData(true);
+      saveData(true);
       render();
     }
 
-    async function deleteRecurring(id) {
+    function deleteRecurring(id) {
+      if (!confirm("この年払い・固定費設定を削除しますか？")) return;
       recurringList = recurringList.filter(r => r.id !== id);
-      await saveData(true);
+      saveData(true);
+      render();
+    }
+
+    function deleteSource(id) {
+      if (sources.length <= 1) {
+        alert("最低1つのカードまたは口座が必要です。");
+        return;
+      }
+      if (!confirm("このカード/口座を削除しますか？\n（関連する利用明細や年払い設定も削除されます）")) return;
+      sources = sources.filter(s => s.id !== id);
+      expenses = expenses.filter(e => e.sourceId !== id);
+      recurringList = recurringList.filter(r => r.sourceId !== id);
+      saveData(true);
       render();
     }
 
@@ -791,24 +1081,47 @@
     function setSourceType(type) {
       selectedSourceType = type;
       if (type === "CREDIT") {
-        document.getElementById("btnTypeCredit").className = "py-1.5 font-bold rounded border bg-indigo-600 border-indigo-500 text-white";
-        document.getElementById("btnTypeBank").className = "py-1.5 font-bold rounded border bg-slate-800 border-slate-700 text-slate-400";
+        document.getElementById("btnTypeCredit").className = "py-1.5 font-bold rounded-lg border bg-indigo-600 border-indigo-600 text-white";
+        document.getElementById("btnTypeBank").className = "py-1.5 font-bold rounded-lg border bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200";
         document.getElementById("creditRuleInputs").classList.remove("hidden");
         document.getElementById("bankRuleInputs").classList.add("hidden");
       } else {
-        document.getElementById("btnTypeCredit").className = "py-1.5 font-bold rounded border bg-slate-800 border-slate-700 text-slate-400";
-        document.getElementById("btnTypeBank").className = "py-1.5 font-bold rounded border bg-teal-600 border-teal-500 text-white";
+        document.getElementById("btnTypeCredit").className = "py-1.5 font-bold rounded-lg border bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200";
+        document.getElementById("btnTypeBank").className = "py-1.5 font-bold rounded-lg border bg-teal-600 border-teal-600 text-white";
         document.getElementById("creditRuleInputs").classList.add("hidden");
         document.getElementById("bankRuleInputs").classList.remove("hidden");
       }
     }
 
-    function initApp() {
-      loadFromLocalStorage();
+    function initDateSelectOptions() {
+      const closingSelect = document.getElementById("srcClosingSelect");
+      if (closingSelect && closingSelect.children.length === 0) {
+        for (let i = 1; i <= 28; i++) {
+          const opt = document.createElement("option");
+          opt.value = i;
+          opt.innerText = `毎月 ${i} 日締め`;
+          if (i === 15) opt.selected = true;
+          closingSelect.appendChild(opt);
+        }
+        const optEnd = document.createElement("option");
+        optEnd.value = 99;
+        optEnd.innerText = `月末締め`;
+        closingSelect.appendChild(optEnd);
+      }
 
-      const dateInput = document.getElementById("expDateInput");
-      if (dateInput) {
-        dateInput.value = new Date().toISOString().split("T")[0];
+      const paySelect = document.getElementById("srcPaymentSelect");
+      if (paySelect && paySelect.children.length === 0) {
+        for (let i = 1; i <= 28; i++) {
+          const opt = document.createElement("option");
+          opt.value = i;
+          opt.innerText = `${i} 日払い`;
+          if (i === 10) opt.selected = true;
+          paySelect.appendChild(opt);
+        }
+        const optEnd = document.createElement("option");
+        optEnd.value = 99;
+        optEnd.innerText = `末日払い`;
+        paySelect.appendChild(optEnd);
       }
 
       const bankSelect = document.getElementById("srcBankPaySelect");
@@ -820,6 +1133,35 @@
           if (i === 25) opt.selected = true;
           bankSelect.appendChild(opt);
         }
+        const optEnd = document.createElement("option");
+        optEnd.value = 99;
+        optEnd.innerText = `毎月末日`;
+        bankSelect.appendChild(optEnd);
+      }
+
+      const recDaySelect = document.getElementById("recDaySelect");
+      if (recDaySelect && recDaySelect.children.length === 0) {
+        for (let i = 1; i <= 28; i++) {
+          const opt = document.createElement("option");
+          opt.value = i;
+          opt.innerText = `${i} 日`;
+          if (i === 20) opt.selected = true;
+          recDaySelect.appendChild(opt);
+        }
+        const optEnd = document.createElement("option");
+        optEnd.value = 99;
+        optEnd.innerText = `末日`;
+        recDaySelect.appendChild(optEnd);
+      }
+    }
+
+    function initApp() {
+      initDateSelectOptions();
+      loadFromLocalStorage();
+
+      const dateInput = document.getElementById("expDateInput");
+      if (dateInput) {
+        dateInput.value = new Date().toISOString().split("T")[0];
       }
       render();
     }
