@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MoneyMoney</title>
+  <!-- ファビコン設定 -->
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
@@ -18,8 +21,8 @@
         💰 MoneyMoney
       </h1>
 
-      <!-- 明細入力ボタン -->
-      <button onclick="openExpenseModalWithSource()" class="px-5 py-2.5 text-sm font-black rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md flex items-center gap-1 active:scale-95 transition">
+      <!-- スマホでも押しやすい大きめの明細入力ボタン -->
+      <button onclick="openExpenseModalWithSource()" class="px-5 py-2.5 text-sm font-black rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20 flex items-center gap-1 active:scale-95 transition">
         <span class="text-lg leading-none">＋</span> 明細入力
       </button>
     </div>
@@ -40,7 +43,7 @@
           <button onclick="changeMonth(-1)" class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold active:scale-95 transition">◀</button>
           <div class="text-center min-w-[120px]">
             <span class="text-[10px] text-slate-400 font-bold block">引き落とし月</span>
-            <span id="currentMonthLabel" class="text-2xl font-black text-indigo-600">2026年 10月</span>
+            <span id="currentMonthLabel" class="text-2xl font-black text-indigo-600">----年 --月</span>
           </div>
           <button onclick="changeMonth(1)" class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold active:scale-95 transition">▶</button>
         </div>
@@ -138,7 +141,7 @@
 
       <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 px-1">
         <div id="dataCountSummary">登録明細: 0件 | カード/口座: 0件 | 年払い: 0件</div>
-        <button onclick="resetToDefaultData()" class="text-slate-500 hover:text-rose-600 underline">
+        <button onclick="confirmResetData()" class="text-slate-500 hover:text-rose-600 underline">
           初期サンプルデータに戻す
         </button>
       </div>
@@ -305,11 +308,24 @@
     </div>
   </div>
 
+  <!-- 安全な確認・通知用カスタムモーダル -->
+  <div id="confirmModal" class="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl max-w-xs w-full p-5 space-y-4 text-xs shadow-2xl text-center">
+      <div id="confirmModalIcon" class="text-3xl">⚠️</div>
+      <p id="confirmModalMessage" class="text-slate-800 font-medium leading-relaxed"></p>
+      <div class="flex gap-2 pt-2">
+        <button type="button" id="confirmModalCancelBtn" onclick="closeConfirmModal(false)" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg">キャンセル</button>
+        <button type="button" id="confirmModalOkBtn" onclick="closeConfirmModal(true)" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg">OK</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const STORAGE_KEY = "moneymoney_app_data_v1";
 
-    let currentMonth = "2026-10";
+    let currentMonth = "";
     let selectedSourceType = "CREDIT";
+    let confirmCallback = null;
 
     const defaultData = {
       sources: [
@@ -335,6 +351,7 @@
     let expenses = [];
     let recurringList = [];
 
+    // --- トースト通知 ---
     let toastTimeout = null;
     function showSaveToast(message = "ブラウザに自動保存しました") {
       const toast = document.getElementById("saveToast");
@@ -350,6 +367,23 @@
       }, 1500);
     }
 
+    // --- 安全なカスタム確認モーダル ---
+    function customConfirm(message, callback, isAlertOnly = false) {
+      confirmCallback = callback;
+      document.getElementById("confirmModalMessage").innerText = message;
+      document.getElementById("confirmModalCancelBtn").style.display = isAlertOnly ? "none" : "block";
+      document.getElementById("confirmModal").classList.remove("hidden");
+    }
+
+    function closeConfirmModal(result) {
+      document.getElementById("confirmModal").classList.add("hidden");
+      if (confirmCallback) {
+        confirmCallback(result);
+        confirmCallback = null;
+      }
+    }
+
+    // --- ローカルストレージ読込 ---
     function loadFromLocalStorage() {
       let isLoaded = false;
       try {
@@ -401,13 +435,16 @@
       }
     }
 
-    function resetToDefaultData() {
-      if (!confirm("すべてのデータを初期のサンプル状態にリセットしますか？\n（現在の入力内容は消去されます）")) return;
-      sources = JSON.parse(JSON.stringify(defaultData.sources));
-      expenses = JSON.parse(JSON.stringify(defaultData.expenses));
-      recurringList = JSON.parse(JSON.stringify(defaultData.recurringList));
-      saveData(true);
-      render();
+    function confirmResetData() {
+      customConfirm("すべてのデータを初期のサンプル状態にリセットしますか？\n（現在の入力内容は消去されます）", (ok) => {
+        if (!ok) return;
+        sources = JSON.parse(JSON.stringify(defaultData.sources));
+        expenses = JSON.parse(JSON.stringify(defaultData.expenses));
+        recurringList = JSON.parse(JSON.stringify(defaultData.recurringList));
+        saveData(true);
+        currentMonth = getInitialMonth();
+        render();
+      });
     }
 
     function exportDataToFile() {
@@ -441,10 +478,11 @@
         try {
           const parsed = JSON.parse(e.target.result);
           if (!parsed.sources || !Array.isArray(parsed.sources)) {
-            alert("MoneyMoneyの有効なデータファイルではありません。");
+            customConfirm("MoneyMoneyの有効なデータファイルではありません。", null, true);
             return;
           }
-          if (confirm("選択したファイルの内容で復元しますか？（現在のデータは上書きされます）")) {
+          customConfirm("選択したファイルの内容で復元しますか？（現在のデータは上書きされます）", (ok) => {
+            if (!ok) return;
             sources = (parsed.sources || []).map(s => ({
               ...s,
               paymentMonthOffset: typeof s.paymentMonthOffset === 'number' ? s.paymentMonthOffset : (s.type === 'CREDIT' ? 1 : 0)
@@ -456,11 +494,12 @@
               targetDay: typeof r.targetDay === 'number' ? r.targetDay : 10
             }));
             saveData(true);
+            currentMonth = getInitialMonth();
             render();
-            alert("データを正常に復元しました！");
-          }
+            showSaveToast("データを正常に復元しました！");
+          });
         } catch (err) {
-          alert("ファイルの解析に失敗しました。正しいJSONファイルかご確認ください。");
+          customConfirm("ファイルの解析に失敗しました。正しいJSONファイルかご確認ください。", null, true);
         }
         event.target.value = "";
       };
@@ -512,7 +551,7 @@
     function getRecurringDueDateInfo(recurringItem, source, targetYear) {
       if (!source) return { payMonth: "", payDate: "", useDateStr: "" };
 
-      const year = targetYear || Number(currentMonth.split("-")[0]);
+      const year = targetYear || Number((currentMonth || new Date().toISOString().slice(0, 7)).split("-")[0]);
       const month = recurringItem.targetMonth || 1;
       const lastDayOfMonth = new Date(year, month, 0).getDate();
       const day = recurringItem.targetDay === 99 ? lastDayOfMonth : Math.min(recurringItem.targetDay || 1, lastDayOfMonth);
@@ -526,6 +565,45 @@
         useMonth: month,
         useDay: day
       };
+    }
+
+    // --- 月の自動判定 ---
+    function getInitialMonth() {
+      const now = new Date();
+      const curY = now.getFullYear();
+      const curM = now.getMonth() + 1;
+      const curD = now.getDate();
+      const todayStr = `${curY}-${String(curM).padStart(2, '0')}-${String(curD).padStart(2, '0')}`;
+      const curMonthStr = `${curY}-${String(curM).padStart(2, '0')}`;
+
+      const curExpenses = expenses.map(e => {
+        const src = sources.find(s => s.id === e.sourceId);
+        const { payMonth, payDate } = calculateDueDate(e.date, src);
+        return { payMonth, payDate };
+      }).filter(e => e.payMonth === curMonthStr);
+
+      const curRecurring = [];
+      recurringList.forEach(r => {
+        const src = sources.find(s => s.id === r.sourceId);
+        if (!src) return;
+        [-1, 0, 1].forEach(offsetYear => {
+          const dueInfo = getRecurringDueDateInfo(r, src, curY + offsetYear);
+          if (dueInfo && dueInfo.payMonth === curMonthStr) {
+            curRecurring.push(dueInfo);
+          }
+        });
+      });
+
+      const hasRemainingDue = 
+        curExpenses.some(e => e.payDate >= todayStr) || 
+        curRecurring.some(r => r.payDate >= todayStr);
+
+      if (hasRemainingDue) {
+        return curMonthStr;
+      } else {
+        const nextDate = new Date(curY, curM, 1);
+        return `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+      }
     }
 
     function openExpenseModalWithSource(sourceId = null) {
@@ -546,7 +624,7 @@
       const previewEl = document.getElementById("recurringRulePreviewText");
       if (!source || !previewEl) return;
 
-      const [curY] = currentMonth.split("-").map(Number);
+      const [curY] = currentMonth ? currentMonth.split("-").map(Number) : [new Date().getFullYear()];
       const dayText = targetDay === 99 ? '末日' : `${targetDay}日`;
 
       if (frequency === "YEARLY") {
@@ -561,7 +639,7 @@
           previewEl.innerText = `毎年 ${targetMonth}月${dayText}発生 ➔ 【${Number(payM)}月${Number(payD)}日引落】(${source.name})`;
         }
       } else {
-        const dummyItem = { targetMonth: Number(currentMonth.split("-")[1]), targetDay, frequency, sourceId };
+        const dummyItem = { targetMonth: Number((currentMonth || new Date().toISOString().slice(0, 7)).split("-")[1]), targetDay, frequency, sourceId };
         const dueInfo = getRecurringDueDateInfo(dummyItem, source, curY);
         const [payY, payM] = dueInfo.payMonth.split("-");
         const payD = dueInfo.payDate.split("-")[2];
@@ -616,7 +694,7 @@
       const sourceId = document.getElementById("recSourceSelect").value;
 
       if (!name || isNaN(amount) || amount <= 0) {
-        alert("正しい名称と金額を入力してください。");
+        customConfirm("正しい名称と金額を入力してください。", null, true);
         return;
       }
 
@@ -693,7 +771,7 @@
       const paymentDay = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcPaymentSelect").value) : Number(document.getElementById("srcBankPaySelect").value);
 
       if (!name) {
-        alert("名前・銀行名を入力してください。");
+        customConfirm("名前・銀行名を入力してください。", null, true);
         return;
       }
 
@@ -712,6 +790,7 @@
     }
 
     function render() {
+      if (!currentMonth) return;
       const [year, month] = currentMonth.split("-").map(Number);
       document.getElementById("currentMonthLabel").innerText = `${year}年 ${month}月`;
 
@@ -772,7 +851,6 @@
 
       const sortedSources = [...sources].sort((a, b) => a.paymentDay - b.paymentDay);
 
-      // 上部カード別引き落とし日
       const topDueContainer = document.getElementById("topSourceDueList");
       topDueContainer.innerHTML = sortedSources.map(src => {
         const cardExpenses = currentExpenses.filter(e => e.sourceId === src.id);
@@ -806,7 +884,6 @@
         `;
       }).join("");
 
-      // 年払いアラート
       const alertBox = document.getElementById("recurringAlertBox");
       if (currentRecurring.length > 0) {
         alertBox.classList.remove("hidden");
@@ -816,7 +893,6 @@
         alertBox.classList.add("hidden");
       }
 
-      // タブ1: 利用明細
       const expensesContainer = document.getElementById("tabContent-expenses");
       if (sortedSources.length === 0) {
         expensesContainer.innerHTML = `<div class="bg-white border border-slate-200 rounded-xl p-8 text-center text-xs text-slate-400">カードや口座が登録されていません。下部の「＋ 口座・カードを追加」から設定してください。</div>`;
@@ -831,18 +907,39 @@
           const lastDayOfCurMonth = new Date(year, month, 0).getDate();
           const displayDay = src.paymentDay === 99 ? lastDayOfCurMonth : src.paymentDay;
 
+          // PCテーブル用HTML
           let itemsHtml = "";
+          // スマホ用リストカードHTML
+          let mobileItemsHtml = "";
           
           if (cardExpenses.length > 0) {
             itemsHtml += cardExpenses.map(e => `
               <tr class="hover:bg-slate-50 transition">
                 <td class="p-3 text-slate-500 whitespace-nowrap">${e.date}</td>
-                <td class="p-3 text-slate-800 font-medium">${e.memo || '未分類'}</td>
-                <td class="p-3 text-right font-bold text-slate-900 whitespace-nowrap">¥${Number(e.amount).toLocaleString()}</td>
+                <td class="p-3 text-slate-800 font-medium break-words leading-relaxed whitespace-normal">${e.memo || '未分類'}</td>
+                <td class="p-3 text-right font-bold text-slate-900 whitespace-nowrap font-mono">¥${Number(e.amount).toLocaleString()}</td>
                 <td class="p-3 text-center whitespace-nowrap">
                   <button onclick="deleteExpense('${e.id}')" title="削除" class="text-slate-400 hover:text-rose-600 font-bold px-2 py-1 rounded hover:bg-slate-100 transition">✕</button>
                 </td>
               </tr>
+            `).join("");
+
+            mobileItemsHtml += cardExpenses.map(e => `
+              <div class="p-3.5 hover:bg-slate-50/80 transition flex items-start justify-between gap-3">
+                <div class="min-w-0 flex-1 space-y-1">
+                  <div class="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                    <span>📅</span>
+                    <span>${e.date}</span>
+                  </div>
+                  <div class="text-xs font-semibold text-slate-900 break-words leading-snug whitespace-normal">
+                    ${e.memo || '未分類'}
+                  </div>
+                </div>
+                <div class="text-right shrink-0 flex items-center gap-2">
+                  <span class="text-sm font-black text-slate-900 font-mono">¥${Number(e.amount).toLocaleString()}</span>
+                  <button onclick="deleteExpense('${e.id}')" title="削除" class="text-slate-400 hover:text-rose-600 font-bold p-1.5 rounded active:bg-slate-200 transition">✕</button>
+                </div>
+              </div>
             `).join("");
           }
 
@@ -853,13 +950,33 @@
                   <span class="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-[10px] text-amber-800 border border-amber-300 font-bold mr-1">年払/固定</span>
                   <span class="text-slate-500 text-[11px]">(${r.useMonth}/${r.useDay}利用分)</span>
                 </td>
-                <td class="p-3 text-amber-900 font-bold">
+                <td class="p-3 text-amber-900 font-bold break-words leading-relaxed whitespace-normal">
                   ${r.name}
                   <span class="text-[10px] text-amber-700 font-normal ml-1">➔ ${month}/${displayDay} 引落</span>
                 </td>
-                <td class="p-3 text-right font-bold text-amber-800 whitespace-nowrap">¥${Number(r.amount).toLocaleString()}</td>
+                <td class="p-3 text-right font-bold text-amber-800 whitespace-nowrap font-mono">¥${Number(r.amount).toLocaleString()}</td>
                 <td class="p-3 text-center text-xs text-slate-400">-</td>
               </tr>
+            `).join("");
+
+            mobileItemsHtml += cardRecs.map(r => `
+              <div class="p-3.5 bg-amber-50/40 hover:bg-amber-50/70 transition flex items-start justify-between gap-3">
+                <div class="min-w-0 flex-1 space-y-1">
+                  <div class="flex items-center gap-1.5 text-[10px]">
+                    <span class="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 font-bold">年払/固定</span>
+                    <span class="text-slate-500 font-mono">(${r.useMonth}/${r.useDay}利用分)</span>
+                  </div>
+                  <div class="text-xs font-bold text-amber-900 break-words leading-snug whitespace-normal">
+                    ${r.name}
+                  </div>
+                  <div class="text-[10px] text-amber-700">
+                    ➔ ${month}月${displayDay}日 引落予定
+                  </div>
+                </div>
+                <div class="text-right shrink-0">
+                  <span class="text-sm font-black text-amber-800 font-mono">¥${Number(r.amount).toLocaleString()}</span>
+                </div>
+              </div>
             `).join("");
           }
 
@@ -895,14 +1012,20 @@
                 </div>
               </div>
 
-              <div class="overflow-x-auto">
+              <!-- スマホ縦画面向け：複数行で余裕を持った見やすいリスト表示 -->
+              <div class="block sm:hidden divide-y divide-slate-100">
+                ${hasItems ? mobileItemsHtml : `<div class="p-4 text-center text-slate-400 text-xs">当月の利用明細はありません</div>`}
+              </div>
+
+              <!-- PC・タブレット向け：従来のテーブル表示（メモ欄の自然な折り返し対応） -->
+              <div class="hidden sm:block overflow-x-auto">
                 <table class="w-full text-left text-xs">
                   <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
                     <tr>
-                      <th class="p-3 w-36">利用日 / 区分</th>
+                      <th class="p-3 w-32">利用日 / 区分</th>
                       <th class="p-3">品目 / メモ</th>
-                      <th class="p-3 text-right w-32">金額</th>
-                      <th class="p-3 text-center w-16">操作</th>
+                      <th class="p-3 text-right w-28">金額</th>
+                      <th class="p-3 text-center w-14">操作</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-100">
@@ -915,7 +1038,6 @@
         }).join("");
       }
 
-      // タブ2: 年払い一覧
       const recurringContainer = document.getElementById("recurringListContainer");
       if (recurringContainer) {
         recurringContainer.innerHTML = recurringList.map(r => {
@@ -951,7 +1073,6 @@
         }).join("");
       }
 
-      // タブ3: カード・口座管理
       const sourcesContainer = document.getElementById("sourcesListContainer");
       if (sourcesContainer) {
         sourcesContainer.innerHTML = sortedSources.map(src => {
@@ -1054,23 +1175,27 @@
     }
 
     function deleteRecurring(id) {
-      if (!confirm("この年払い・固定費設定を削除しますか？")) return;
-      recurringList = recurringList.filter(r => r.id !== id);
-      saveData(true);
-      render();
+      customConfirm("この年払い・固定費設定を削除しますか？", (ok) => {
+        if (!ok) return;
+        recurringList = recurringList.filter(r => r.id !== id);
+        saveData(true);
+        render();
+      });
     }
 
     function deleteSource(id) {
       if (sources.length <= 1) {
-        alert("最低1つのカードまたは口座が必要です。");
+        customConfirm("最低1つのカードまたは口座が必要です。", null, true);
         return;
       }
-      if (!confirm("このカード/口座を削除しますか？\n（関連する利用明細や年払い設定も削除されます）")) return;
-      sources = sources.filter(s => s.id !== id);
-      expenses = expenses.filter(e => e.sourceId !== id);
-      recurringList = recurringList.filter(r => r.sourceId !== id);
-      saveData(true);
-      render();
+      customConfirm("このカード/口座を削除しますか？\n（関連する利用明細や年払い設定も削除されます）", (ok) => {
+        if (!ok) return;
+        sources = sources.filter(s => s.id !== id);
+        expenses = expenses.filter(e => e.sourceId !== id);
+        recurringList = recurringList.filter(r => r.sourceId !== id);
+        saveData(true);
+        render();
+      });
     }
 
     function toggleTargetMonth() {
@@ -1158,6 +1283,8 @@
     function initApp() {
       initDateSelectOptions();
       loadFromLocalStorage();
+
+      currentMonth = getInitialMonth();
 
       const dateInput = document.getElementById("expDateInput");
       if (dateInput) {
