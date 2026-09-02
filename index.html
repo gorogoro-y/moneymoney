@@ -13,7 +13,7 @@
 
   <!-- ヘッダー -->
   <header class="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-30 px-4 py-3 backdrop-blur">
-    <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
+    <div class="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="font-bold text-base text-white flex items-center gap-2">
           💰 マネーマネージャー
@@ -23,18 +23,18 @@
 
       <!-- 操作ボタン群 -->
       <div class="flex flex-wrap items-center gap-2">
-        <!-- 自動保存ステータス（保存時刻を常時表示） -->
-        <div id="saveStatusIndicator" class="px-2.5 py-1.5 text-[11px] font-medium rounded-lg bg-emerald-950/60 text-emerald-400 border border-emerald-500/40 flex items-center gap-1.5 shadow-sm" title="データはブラウザ内にリアルタイムで自動保存されています">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
-          <span id="saveStatusTimeText">自動保存: 有効</span>
-        </div>
-
-        <!-- バックアップ保存・復元 -->
-        <button onclick="exportDataToFile()" title="現在のデータをJSONファイルとしてパソコンに保存（バックアップ）" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 hover:text-white flex items-center gap-1 transition">
-          💾 ファイル保存
+        <!-- ローカルファイル自動同期ボタン & ステータス -->
+        <button id="syncFileBtn" onclick="handleSyncButtonClick()" title="PC上のローカルファイルを指定して、入力のたびに自動上書き保存します" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/20 flex items-center gap-1.5 transition">
+          <span id="syncDot" class="w-2 h-2 rounded-full bg-slate-500 inline-block"></span>
+          <span id="syncBtnText">📁 ローカルファイルと同期</span>
         </button>
 
-        <button onclick="document.getElementById('fileInput').click()" title="保存したJSONファイルを読み込んでデータを復元" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/30 hover:bg-sky-500/20 flex items-center gap-1 transition">
+        <!-- 手動バックアップ/読込 -->
+        <button onclick="exportDataToFile()" title="現在のデータをJSONファイルとしてダウンロード保存" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 hover:text-white flex items-center gap-1 transition">
+          💾 ダウンロード
+        </button>
+
+        <button onclick="document.getElementById('fileInput').click()" title="保存したJSONファイルを開いてデータを復元" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/30 hover:bg-sky-500/20 flex items-center gap-1 transition">
           📂 読込
         </button>
         <input type="file" id="fileInput" accept=".json" class="hidden" onchange="loadFromFile(event)">
@@ -53,12 +53,25 @@
     </div>
   </header>
 
-  <main class="max-w-4xl mx-auto p-4 space-y-5">
+  <main class="max-w-5xl mx-auto p-4 space-y-5">
+
+    <!-- 自動同期・保存案内バナー -->
+    <div id="syncInfoBanner" class="bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-3.5 text-xs text-indigo-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <span class="text-base">🔄</span>
+        <div>
+          <span class="font-bold text-white">ローカル自動保存機能：</span>
+          <span id="syncBannerMessage">
+            「📁 ローカルファイルと同期」を押してPC内のファイル（例: `money_data.json`）を指定すると、明細の追加・削除のたびにそのファイルへ自動で上書き保存されます。
+          </span>
+        </div>
+      </div>
+    </div>
 
     <!-- 自動保存トースト通知 -->
     <div id="saveToast" class="transition-all duration-300 opacity-0 translate-y-2 fixed bottom-4 right-4 z-50 bg-slate-800/95 text-emerald-400 border border-slate-700 px-3.5 py-2 rounded-xl text-xs shadow-2xl flex items-center gap-2 pointer-events-none">
       <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-      <span id="saveToastText">自動保存しました</span>
+      <span id="saveToastText">ローカルファイルへ自動保存しました</span>
     </div>
 
     <!-- 月選択 & 総額表示パネル -->
@@ -284,6 +297,7 @@
 
     let currentMonth = "2026-10";
     let selectedSourceType = "CREDIT";
+    let localFileHandle = null; // ローカル同期対象のファイルハンドル
 
     const defaultData = {
       sources: [
@@ -309,9 +323,9 @@
     let expenses = [];
     let recurringList = [];
 
-    // --- 自動保存トースト表示 ---
+    // --- トースト通知 ---
     let toastTimeout = null;
-    function showSaveToast(message = "自動保存しました") {
+    function showSaveToast(message) {
       const toast = document.getElementById("saveToast");
       const toastText = document.getElementById("saveToastText");
       if (!toast || !toastText) return;
@@ -322,10 +336,10 @@
       toastTimeout = setTimeout(() => {
         toast.classList.remove("opacity-100", "translate-y-0");
         toast.classList.add("opacity-0", "translate-y-2");
-      }, 1800);
+      }, 2000);
     }
 
-    // --- ローカルストレージ読込・自動保存 ---
+    // --- ローカルストレージ読込 ---
     function loadFromLocalStorage() {
       let isLoaded = false;
       try {
@@ -340,7 +354,7 @@
           }
         }
       } catch (e) {
-        console.warn("LocalStorageの読み込みに失敗しました（初期データを使用します）:", e);
+        console.warn("LocalStorage読込失敗:", e);
       }
 
       if (!isLoaded) {
@@ -351,8 +365,8 @@
       }
     }
 
-    // すべての変更時に即時呼ばれる自動保存関数
-    function saveData(showToast = true) {
+    // --- データ保存（ローカルストレージ ＋ 同期中のファイルへ自動上書き） ---
+    async function saveData(showToast = true) {
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
       const payload = {
@@ -362,19 +376,93 @@
         expenses,
         recurringList
       };
+      const jsonStr = JSON.stringify(payload, null, 2);
+
+      // 1. ブラウザ内保存
+      try {
+        localStorage.setItem(STORAGE_KEY, jsonStr);
+      } catch (err) {
+        console.error("LocalStorage保存失敗:", err);
+      }
+
+      // 2. ローカルファイルへの自動上書き保存
+      if (localFileHandle) {
+        try {
+          const writable = await localFileHandle.createWritable();
+          await writable.write(jsonStr);
+          await writable.close();
+          if (showToast) {
+            showSaveToast(`📄 PCファイル [${localFileHandle.name}] へ自動保存済 (${timeStr})`);
+          }
+          return;
+        } catch (err) {
+          console.warn("ファイルへの自動保存に失敗しました:", err);
+          updateSyncUI(false);
+        }
+      }
+
+      if (showToast) {
+        showSaveToast(`ブラウザに自動保存しました (${timeStr})`);
+      }
+    }
+
+    // --- ローカル同期ボタン押下時の処理 ---
+    async function handleSyncButtonClick() {
+      // プレビュー枠（iframe内）かどうかの判定
+      const isInsideIframe = window.self !== window.top;
+
+      if (isInsideIframe) {
+        alert(
+          "【PCファイルへの自動同期について】\n\n" +
+          "チャットのプレビュー画面（iframe）の中からは、ブラウザのセキュリティ制限によりPCのファイルへ直接アクセスできません。\n\n" +
+          "【PCのファイルへ自動保存する手順】\n" +
+          "1. 右側のコード枠から「index.html」をパソコンに保存します。\n" +
+          "2. 保存した「index.html」をダブルクリックしてブラウザ（Chrome / Edge 等）で開きます。\n" +
+          "3. 画面右上の「📁 ローカルファイルと同期」を押してPC上の保存ファイル（例: data.json）を指定すると、完全自動保存が有効になります！"
+        );
+        return;
+      }
+
+      if (!("showSaveFilePicker" in window) && !("showOpenFilePicker" in window)) {
+        alert("お使いのブラウザはローカルファイルとの直接自動同期に対応していません。Google ChromeまたはMicrosoft Edgeをご利用ください。");
+        return;
+      }
 
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-        // ヘッダーの保存時刻表示を更新
-        const statusText = document.getElementById("saveStatusTimeText");
-        if (statusText) {
-          statusText.innerText = `保存済: ${timeStr}`;
-        }
-        if (showToast) {
-          showSaveToast(`ブラウザ内に自動保存しました (${timeStr})`);
-        }
+        // 保存先ファイルを指定（新規作成または既存ファイル選択）
+        localFileHandle = await window.showSaveFilePicker({
+          suggestedName: "money_manager_data.json",
+          types: [{
+            description: "マネーマネージャー データファイル (*.json)",
+            accept: { "application/json": [".json"] }
+          }]
+        });
+
+        // 選択されたファイルへ即座に現在のデータを上書き保存
+        await saveData(false);
+        updateSyncUI(true, localFileHandle.name);
+        alert(`ファイル「${localFileHandle.name}」と接続しました！\n今後、明細の追加や変更を行うたびに、このファイルへ自動で上書き保存されます。`);
       } catch (err) {
-        console.error("LocalStorageへの保存に失敗しました:", err);
+        if (err.name === "AbortError") return;
+        console.error("ファイル同期エラー:", err);
+        alert("ファイルの指定に失敗しました。");
+      }
+    }
+
+    // --- 同期状態のUI更新 ---
+    function updateSyncUI(isConnected, filename = "") {
+      const dot = document.getElementById("syncDot");
+      const btnText = document.getElementById("syncBtnText");
+      const bannerMsg = document.getElementById("syncBannerMessage");
+
+      if (isConnected && filename) {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block";
+        btnText.innerText = `🟢 同期中: ${filename}`;
+        bannerMsg.innerText = `現在、PC上のファイル「${filename}」と自動同期中です。変更は即座にファイルへ上書き保存されます。`;
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-slate-500 inline-block";
+        btnText.innerText = `📁 ローカルファイルと同期`;
+        bannerMsg.innerText = `「📁 ローカルファイルと同期」を押してPC内のファイル（例: money_data.json）を指定すると、入力のたびにそのファイルへ自動で上書き保存されます。`;
       }
     }
 
@@ -388,7 +476,7 @@
       render();
     }
 
-    // --- 安全なファイルダウンロード保存（バックアップ） ---
+    // --- 手動ファイルダウンロード（バックアップ） ---
     function exportDataToFile() {
       const dataStr = JSON.stringify({
         version: "1.0",
@@ -606,7 +694,6 @@
         `;
       }).join("");
 
-      // フッター集計カウント
       const countEl = document.getElementById("dataCountSummary");
       if (countEl) {
         countEl.innerText = `登録明細: ${expenses.length}件 | カード/口座: ${sources.length}件 | 年払い: ${recurringList.length}件`;
@@ -642,21 +729,21 @@
       if (recSelect) recSelect.innerHTML = opts;
     }
 
-    function handleCreateExpense(e) {
+    async function handleCreateExpense(e) {
       e.preventDefault();
       const sourceId = document.getElementById("expSourceSelect").value;
       const date = document.getElementById("expDateInput").value;
       const amount = Number(document.getElementById("expAmountInput").value);
       const memo = document.getElementById("expMemoInput").value;
       expenses.unshift({ id: "e-" + Date.now(), sourceId, date, amount, memo });
-      saveData(true);
+      await saveData(true);
       closeModal("expenseModal");
       document.getElementById("expAmountInput").value = "";
       document.getElementById("expMemoInput").value = "";
       render();
     }
 
-    function handleCreateRecurring(e) {
+    async function handleCreateRecurring(e) {
       e.preventDefault();
       const name = document.getElementById("recNameInput").value;
       const frequency = document.getElementById("recFreqSelect").value;
@@ -664,35 +751,35 @@
       const amount = Number(document.getElementById("recAmountInput").value);
       const sourceId = document.getElementById("recSourceSelect").value;
       recurringList.push({ id: "r-" + Date.now(), name, frequency, targetMonth, amount, sourceId });
-      saveData(true);
+      await saveData(true);
       closeModal("recurringModal");
       document.getElementById("recNameInput").value = "";
       document.getElementById("recAmountInput").value = "";
       render();
     }
 
-    function handleCreateSource(e) {
+    async function handleCreateSource(e) {
       e.preventDefault();
       const name = document.getElementById("srcNameInput").value;
       const closingDay = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcClosingSelect").value) : 0;
       const paymentDay = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcPaymentSelect").value) : Number(document.getElementById("srcBankPaySelect").value);
 
       sources.push({ id: "s-" + Date.now(), name, type: selectedSourceType, closingDay, paymentDay });
-      saveData(true);
+      await saveData(true);
       closeModal("sourceModal");
       document.getElementById("srcNameInput").value = "";
       render();
     }
 
-    function deleteExpense(id) {
+    async function deleteExpense(id) {
       expenses = expenses.filter(e => e.id !== id);
-      saveData(true);
+      await saveData(true);
       render();
     }
 
-    function deleteRecurring(id) {
+    async function deleteRecurring(id) {
       recurringList = recurringList.filter(r => r.id !== id);
-      saveData(true);
+      await saveData(true);
       render();
     }
 
@@ -716,7 +803,6 @@
       }
     }
 
-    // --- 初期化処理（即時実行 & DOMContentLoaded両対応） ---
     function initApp() {
       loadFromLocalStorage();
 
