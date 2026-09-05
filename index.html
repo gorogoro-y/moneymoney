@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MoneyMoney</title>
+  <title>まにゃーまにゃー</title>
   <!-- ファビコン設定 -->
   <link rel="icon" href="favicon.ico" type="image/x-icon">
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
@@ -22,7 +22,7 @@
   <header class="border-b border-slate-200 bg-white sticky top-0 z-30 px-4 py-3 shadow-sm">
     <div class="max-w-4xl mx-auto flex items-center justify-between gap-2">
       <h1 class="font-black text-xl text-slate-900 flex items-center gap-1.5">
-        💰 MoneyMoney
+        🐱💰 まにゃーまにゃー
       </h1>
 
       <!-- スマホでも押しやすい大きめの明細入力ボタン -->
@@ -82,7 +82,7 @@
     <!-- タブ切り替えボタン -->
     <div class="flex border-b border-slate-200 text-xs font-semibold gap-4">
       <button onclick="switchTab('expenses')" id="tabBtn-expenses" class="pb-2.5 border-b-2 border-indigo-600 text-indigo-600">
-        当月の利用明細（カード別）
+        当月の利用明細（カード・口座別）
       </button>
       <button onclick="switchTab('recurring')" id="tabBtn-recurring" class="pb-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
         年払い・固定費一覧
@@ -109,7 +109,7 @@
     <!-- タブ3: カード・口座の管理 -->
     <div id="tabContent-sources" class="space-y-4 hidden">
       <div class="flex justify-between items-center bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
-        <span class="text-xs text-slate-500">締め日・支払日ルールを設定できます。</span>
+        <span class="text-xs text-slate-500">クレジットカードの締め日や銀行口座を設定できます。</span>
         <button onclick="openCreateSourceModal()" class="px-3 py-2 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition active:scale-95">
           ＋ 口座・カードを追加
         </button>
@@ -168,7 +168,7 @@
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="text-slate-600 block mb-1 font-medium">利用日</label>
+            <label class="text-slate-600 block mb-1 font-medium">利用日 / 引落日</label>
             <input type="date" id="expDateInput" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
           </div>
           <div>
@@ -178,7 +178,7 @@
         </div>
         <div>
           <label class="text-slate-600 block mb-1 font-medium">内容・店名</label>
-          <input type="text" id="expMemoInput" placeholder="スーパー、ドラッグストアなど" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
+          <input type="text" id="expMemoInput" placeholder="スーパー、ガス代、電気代など" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
         </div>
         <div class="pt-2 flex gap-2">
           <button type="button" onclick="closeModal('expenseModal')" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg">閉じる</button>
@@ -199,7 +199,7 @@
         <input type="hidden" id="editingRecurringId" value="">
         <div>
           <label class="text-slate-600 block mb-1 font-medium">項目の名称</label>
-          <input type="text" id="recNameInput" required placeholder="例: Amazonプライム年払い、自動車税" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
+          <input type="text" id="recNameInput" required placeholder="例: Amazonプライム年払い、家賃、自動車税" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
         </div>
 
         <div>
@@ -223,10 +223,10 @@
 
         <!-- 請求・利用日設定 -->
         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-          <label class="text-slate-700 block font-semibold text-[11px]">請求・利用のタイミング（発生日）</label>
+          <label class="text-slate-700 block font-semibold text-[11px]">請求・利用・引落のタイミング</label>
           <div class="grid grid-cols-2 gap-2">
             <div id="targetMonthWrapper">
-              <label class="text-slate-500 block mb-0.5 text-[10px]">利用・請求月</label>
+              <label class="text-slate-500 block mb-0.5 text-[10px]">利用・引落月</label>
               <select id="recMonthSelect" onchange="updateRecurringRulePreview()" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
                 <option value="1">毎年 1月</option><option value="2">毎年 2月</option><option value="3">毎年 3月</option>
                 <option value="4">毎年 4月</option><option value="5">毎年 5月</option><option value="6">毎年 6月</option>
@@ -235,7 +235,7 @@
               </select>
             </div>
             <div>
-              <label class="text-slate-500 block mb-0.5 text-[10px]">利用・請求日</label>
+              <label class="text-slate-500 block mb-0.5 text-[10px]">利用・引落日</label>
               <select id="recDaySelect" onchange="updateRecurringRulePreview()" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500"></select>
             </div>
           </div>
@@ -266,13 +266,13 @@
         <div>
           <label class="text-slate-600 block mb-1 font-medium">種別</label>
           <div class="grid grid-cols-2 gap-2">
-            <button type="button" id="btnTypeCredit" onclick="setSourceType('CREDIT')" class="py-1.5 font-bold rounded-lg border bg-indigo-600 border-indigo-600 text-white">クレカ</button>
-            <button type="button" id="btnTypeBank" onclick="setSourceType('BANK_DIRECT')" class="py-1.5 font-bold rounded-lg border bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200">銀行振替</button>
+            <button type="button" id="btnTypeCredit" onclick="setSourceType('CREDIT')" class="py-1.5 font-bold rounded-lg border bg-indigo-600 border-indigo-600 text-white">クレジットカード</button>
+            <button type="button" id="btnTypeBank" onclick="setSourceType('BANK_DIRECT')" class="py-1.5 font-bold rounded-lg border bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200">銀行口座 (口座振替)</button>
           </div>
         </div>
         <div>
-          <label class="text-slate-600 block mb-1 font-medium">名前・銀行名</label>
-          <input type="text" id="srcNameInput" required placeholder="例: 楽天カード / 三井住友カード" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
+          <label class="text-slate-600 block mb-1 font-medium">名前・金融機関名</label>
+          <input type="text" id="srcNameInput" required placeholder="例: 楽天カード / 三菱UFJ銀行" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
         </div>
 
         <div id="creditRuleInputs" class="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
@@ -300,9 +300,14 @@
           </div>
         </div>
 
-        <div id="bankRuleInputs" class="hidden p-3 bg-slate-50 rounded-xl border border-slate-200">
-          <label class="text-slate-700 block mb-1 font-semibold">毎月の振替日（引き落とし日）</label>
-          <select id="srcBankPaySelect" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-800 text-xs focus:outline-none focus:border-indigo-500"></select>
+        <div id="bankRuleInputs" class="hidden p-3 bg-teal-50/70 rounded-xl border border-teal-200 text-teal-900 space-y-1">
+          <div class="font-bold text-[11px] flex items-center gap-1">
+            <span>ℹ️</span> 口座振替の引き落とし日について
+          </div>
+          <p class="text-[10px] leading-relaxed text-teal-800">
+            電気代、ガス代、家賃など項目ごとに引き落とし日が異なるため、口座ごとの固定振替日は設定不要です。<br>
+            <strong>明細入力時に指定した「利用日/引落日」がそのまま引き落とし日として自動集計されます。</strong>
+          </p>
         </div>
 
         <div class="pt-2 flex gap-2">
@@ -336,14 +341,14 @@
       sources: [
         { id: "s-1", name: "三井住友カード (NL)", type: "CREDIT", closingDay: 15, paymentMonthOffset: 1, paymentDay: 10 },
         { id: "s-2", name: "楽天カード", type: "CREDIT", closingDay: 99, paymentMonthOffset: 1, paymentDay: 27 },
-        { id: "s-3", name: "三菱UFJ銀行 (口座振替)", type: "BANK_DIRECT", closingDay: 0, paymentMonthOffset: 0, paymentDay: 25 }
+        { id: "s-3", name: "三菱UFJ銀行 (口座振替)", type: "BANK_DIRECT", closingDay: 0, paymentMonthOffset: 0, paymentDay: 0 }
       ],
       expenses: [
         { id: "e-1", sourceId: "s-1", date: "2026-08-20", amount: 6200, memo: "スーパー食材まとめ買い" },
         { id: "e-2", sourceId: "s-1", date: "2026-09-05", amount: 13500, memo: "秋物衣料" },
         { id: "e-3", sourceId: "s-2", date: "2026-08-28", amount: 28000, memo: "家電量販店" },
         { id: "e-4", sourceId: "s-3", date: "2026-10-25", amount: 75000, memo: "10月分 家賃" },
-        { id: "e-5", sourceId: "s-3", date: "2026-10-25", amount: 8900, memo: "水道・光熱費" }
+        { id: "e-5", sourceId: "s-3", date: "2026-10-12", amount: 8900, memo: "ガス・水道光熱費" }
       ],
       recurringList: [
         { id: "r-1", name: "楽天ゴールド 年会費", amount: 11000, frequency: "YEARLY", targetMonth: 9, targetDay: 20, sourceId: "s-2" },
@@ -398,7 +403,8 @@
           if (parsed && Array.isArray(parsed.sources)) {
             sources = parsed.sources.map(s => ({
               ...s,
-              paymentMonthOffset: typeof s.paymentMonthOffset === 'number' ? s.paymentMonthOffset : (s.type === 'CREDIT' ? 1 : 0)
+              paymentMonthOffset: typeof s.paymentMonthOffset === 'number' ? s.paymentMonthOffset : (s.type === 'CREDIT' ? 1 : 0),
+              paymentDay: typeof s.paymentDay === 'number' ? s.paymentDay : 0
             }));
             expenses = parsed.expenses || [];
             recurringList = (parsed.recurringList || []).map(r => ({
@@ -423,7 +429,7 @@
 
     function saveData(showToast = true) {
       const payload = {
-        version: "1.2",
+        version: "1.3",
         lastSaved: new Date().toISOString(),
         sources,
         expenses,
@@ -454,14 +460,14 @@
 
     function exportDataToFile() {
       const dataStr = JSON.stringify({
-        version: "1.2",
+        version: "1.3",
         exportedAt: new Date().toISOString(),
         sources,
         expenses,
         recurringList
       }, null, 2);
 
-      const defaultFilename = `MoneyMoney_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      const defaultFilename = `まにゃーまにゃー_backup_${new Date().toISOString().slice(0, 10)}.json`;
       const blob = new Blob([dataStr], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -483,14 +489,15 @@
         try {
           const parsed = JSON.parse(e.target.result);
           if (!parsed.sources || !Array.isArray(parsed.sources)) {
-            customConfirm("MoneyMoneyの有効なデータファイルではありません。", null, true);
+            customConfirm("まにゃーまにゃーの有効なデータファイルではありません。", null, true);
             return;
           }
           customConfirm("選択したファイルの内容で復元しますか？（現在のデータは上書きされます）", (ok) => {
             if (!ok) return;
             sources = (parsed.sources || []).map(s => ({
               ...s,
-              paymentMonthOffset: typeof s.paymentMonthOffset === 'number' ? s.paymentMonthOffset : (s.type === 'CREDIT' ? 1 : 0)
+              paymentMonthOffset: typeof s.paymentMonthOffset === 'number' ? s.paymentMonthOffset : (s.type === 'CREDIT' ? 1 : 0),
+              paymentDay: typeof s.paymentDay === 'number' ? s.paymentDay : 0
             }));
             expenses = parsed.expenses || [];
             recurringList = (parsed.recurringList || []).map(r => ({
@@ -511,17 +518,18 @@
       reader.readAsText(file);
     }
 
+    // --- 引き落とし日・月の計算 ---
     function calculateDueDate(dateStr, source) {
       if (!source || !dateStr) return { payMonth: "", payDate: "" };
       const [y, m, d] = dateStr.split("-").map(Number);
 
+      // 銀行口座（口座振替）の場合：入力された利用日がそのまま引き落とし日になる
       if (source.type === "BANK_DIRECT") {
         const pMonth = `${y}-${String(m).padStart(2, '0')}`;
-        const lastDayOfM = new Date(y, m, 0).getDate();
-        const payDay = source.paymentDay === 99 ? lastDayOfM : Math.min(source.paymentDay || d, lastDayOfM);
-        return { payMonth: pMonth, payDate: `${pMonth}-${String(payDay).padStart(2, '0')}` };
+        return { payMonth: pMonth, payDate: dateStr };
       }
 
+      // クレジットカードの場合：締め日と支払日ルールに基づいて計算
       let closeY = y;
       let closeM = m - 1;
 
@@ -654,7 +662,7 @@
       const memo = document.getElementById("expMemoInput").value.trim();
 
       if (!sourceId || !date || isNaN(amount) || amount <= 0) {
-        customConfirm("正しい支払元、利用日、金額を入力してください。", null, true);
+        customConfirm("正しい支払元、日付、金額を入力してください。", null, true);
         return;
       }
 
@@ -712,7 +720,7 @@
         if (source.type === "CREDIT") {
           previewEl.innerText = `毎年 ${targetMonth}月${dayText}利用 ➔ 【${Number(payM)}月${Number(payD)}日引落】(${source.name}の締め日/支払日を自動適用)`;
         } else {
-          previewEl.innerText = `毎年 ${targetMonth}月${dayText}発生 ➔ 【${Number(payM)}月${Number(payD)}日引落】(${source.name})`;
+          previewEl.innerText = `毎年 【${targetMonth}月${dayText}引落】(口座振替: ${source.name})`;
         }
       } else {
         const dummyItem = { targetMonth: Number((currentMonth || new Date().toISOString().slice(0, 7)).split("-")[1]), targetDay, frequency, sourceId };
@@ -720,7 +728,11 @@
         const [payY, payM] = dueInfo.payMonth.split("-");
         const payD = dueInfo.payDate.split("-")[2];
 
-        previewEl.innerText = `毎月 ${dayText}利用 ➔ 毎月 ${Number(payD)}日頃引落 (${source.name})`;
+        if (source.type === "CREDIT") {
+          previewEl.innerText = `毎月 ${dayText}利用 ➔ 毎月 ${Number(payD)}日頃引落 (${source.name})`;
+        } else {
+          previewEl.innerText = `毎月 【${dayText}引落】(口座振替: ${source.name})`;
+        }
       }
     }
 
@@ -811,7 +823,6 @@
       document.getElementById("srcClosingSelect").value = "15";
       document.getElementById("srcPaymentOffsetSelect").value = "1";
       document.getElementById("srcPaymentSelect").value = "10";
-      document.getElementById("srcBankPaySelect").value = "25";
       setSourceType("CREDIT");
       updateCreditRulePreview();
       openModal("sourceModal");
@@ -832,8 +843,6 @@
         document.getElementById("srcPaymentOffsetSelect").value = String(typeof src.paymentMonthOffset === 'number' ? src.paymentMonthOffset : 1);
         document.getElementById("srcPaymentSelect").value = String(src.paymentDay);
         updateCreditRulePreview();
-      } else {
-        document.getElementById("srcBankPaySelect").value = String(src.paymentDay);
       }
       openModal("sourceModal");
     }
@@ -844,10 +853,10 @@
       const name = document.getElementById("srcNameInput").value.trim();
       const closingDay = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcClosingSelect").value) : 0;
       const paymentMonthOffset = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcPaymentOffsetSelect").value) : 0;
-      const paymentDay = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcPaymentSelect").value) : Number(document.getElementById("srcBankPaySelect").value);
+      const paymentDay = selectedSourceType === "CREDIT" ? Number(document.getElementById("srcPaymentSelect").value) : 0;
 
       if (!name) {
-        customConfirm("名前・銀行名を入力してください。", null, true);
+        customConfirm("名前・金融機関名を入力してください。", null, true);
         return;
       }
 
@@ -925,7 +934,11 @@
       document.getElementById("regularSubtotalLabel").innerText = `¥${regularTotal.toLocaleString()}`;
       document.getElementById("recurringSubtotalLabel").innerText = `¥${recurringTotal.toLocaleString()}`;
 
-      const sortedSources = [...sources].sort((a, b) => a.paymentDay - b.paymentDay);
+      // カード・口座の並び順（クレジットカードは支払日順、銀行口座は後ろへ）
+      const sortedSources = [...sources].sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'CREDIT' ? -1 : 1;
+        return (a.paymentDay || 0) - (b.paymentDay || 0);
+      });
 
       const topDueContainer = document.getElementById("topSourceDueList");
       topDueContainer.innerHTML = sortedSources.map(src => {
@@ -934,18 +947,34 @@
         const total = cardExpenses.reduce((sum, e) => sum + Number(e.amount), 0) +
                       cardRecs.reduce((sum, r) => sum + Number(r.amount), 0);
 
-        const lastDayOfCurMonth = new Date(year, month, 0).getDate();
-        const displayDay = src.paymentDay === 99 ? lastDayOfCurMonth : src.paymentDay;
+        let dateDisplay = "";
+        if (src.type === 'CREDIT') {
+          const lastDayOfCurMonth = new Date(year, month, 0).getDate();
+          const displayDay = src.paymentDay === 99 ? lastDayOfCurMonth : src.paymentDay;
+          dateDisplay = `${month}月${displayDay}日`;
+        } else {
+          // 口座振替の場合：当月に引き落とされる日の一覧
+          const dates = [...new Set([
+            ...cardExpenses.map(e => Number(e.payDate.split("-")[2])),
+            ...cardRecs.map(r => Number(r.payDate.split("-")[2]))
+          ])].filter(Boolean).sort((a, b) => a - b);
+
+          if (dates.length > 0) {
+            dateDisplay = `${month}月 ${dates.map(d => d + '日').join(', ')}`;
+          } else {
+            dateDisplay = '指定日引落';
+          }
+        }
 
         return `
           <div class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 shadow-sm">
             <div class="min-w-0">
               <div class="flex items-center gap-1.5">
                 <span class="text-[11px] font-bold text-slate-800">
-                  ${month}月${displayDay}日
+                  ${dateDisplay}
                 </span>
                 <span class="text-[10px] px-1.5 py-0.2 rounded font-semibold ${src.type === 'CREDIT' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-teal-50 text-teal-700 border border-teal-200'}">
-                  ${src.type === 'CREDIT' ? 'クレカ' : '振替'}
+                  ${src.type === 'CREDIT' ? 'クレカ' : '口座振替'}
                 </span>
               </div>
               <div class="text-xs font-semibold text-slate-700 truncate mt-0.5">
@@ -953,7 +982,7 @@
               </div>
             </div>
             <div class="text-right shrink-0">
-              <span class="text-[10px] text-slate-400 block">引落額</span>
+              <span class="text-[10px] text-slate-400 block">引落予定額</span>
               <span class="text-sm font-bold text-slate-900">¥${total.toLocaleString()}</span>
             </div>
           </div>
@@ -964,7 +993,7 @@
       if (currentRecurring.length > 0) {
         alertBox.classList.remove("hidden");
         document.getElementById("recurringAlertText").innerText =
-          `今月はカード締め日・支払日計算に基づき、${currentRecurring.map(r => `${r.name} (¥${r.amount.toLocaleString()})`).join("、 ")} の引き落としが予定されています。`;
+          `今月は${currentRecurring.map(r => `${r.name} (¥${r.amount.toLocaleString()})`).join("、 ")} の引き落としが予定されています。`;
       } else {
         alertBox.classList.add("hidden");
       }
@@ -982,6 +1011,7 @@
 
           const lastDayOfCurMonth = new Date(year, month, 0).getDate();
           const displayDay = src.paymentDay === 99 ? lastDayOfCurMonth : src.paymentDay;
+          const offsetName = (src.paymentMonthOffset === 2) ? '翌々月' : ((src.paymentMonthOffset === 0) ? '当月' : '翌月');
 
           // PCテーブル用HTML
           let itemsHtml = "";
@@ -1027,12 +1057,11 @@
             itemsHtml += cardRecs.map(r => `
               <tr onclick="openEditRecurringModal('${r.id}')" class="bg-amber-50/40 hover:bg-amber-100/60 cursor-pointer transition group" title="クリックして年払いを編集">
                 <td class="p-3 text-amber-800 whitespace-nowrap font-medium">
-                  <span class="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-[10px] text-amber-800 border border-amber-300 font-bold mr-1">年払/固定</span>
-                  <span class="text-slate-500 text-[11px]">(${r.useMonth}/${r.useDay}利用分)</span>
+                  <span class="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-[10px] text-amber-800 border border-amber-300 font-bold mr-1">固定/年払</span>
+                  <span class="text-slate-500 text-[11px]">${r.payDate}</span>
                 </td>
                 <td class="p-3 text-amber-900 font-bold break-words leading-relaxed whitespace-normal">
                   ${r.name}
-                  <span class="text-[10px] text-amber-700 font-normal ml-1">➔ ${month}/${displayDay} 引落</span>
                   <span class="opacity-0 group-hover:opacity-100 text-[10px] text-amber-600 font-semibold ml-1.5 transition-opacity">✏️編集</span>
                 </td>
                 <td class="p-3 text-right font-bold text-amber-800 whitespace-nowrap">¥${Number(r.amount).toLocaleString()}</td>
@@ -1044,15 +1073,12 @@
               <div onclick="openEditRecurringModal('${r.id}')" class="p-3.5 bg-amber-50/40 hover:bg-amber-100/60 active:bg-amber-100 cursor-pointer transition flex items-start justify-between gap-3 group" title="タップして年払いを編集">
                 <div class="min-w-0 flex-1 space-y-1">
                   <div class="flex items-center gap-1.5 text-[10px]">
-                    <span class="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 font-bold">年払/固定</span>
-                    <span class="text-slate-500">(${r.useMonth}/${r.useDay}利用分)</span>
+                    <span class="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 font-bold">固定/年払</span>
+                    <span class="text-slate-500">${r.payDate}</span>
                     <span class="text-amber-700">✏️編集</span>
                   </div>
                   <div class="text-xs font-bold text-amber-900 break-words leading-snug whitespace-normal">
                     ${r.name}
-                  </div>
-                  <div class="text-[10px] text-amber-700">
-                    ➔ ${month}月${displayDay}日 引落予定
                   </div>
                 </div>
                 <div class="text-right shrink-0">
@@ -1063,22 +1089,25 @@
           }
 
           const hasItems = cardExpenses.length > 0 || cardRecs.length > 0;
-          const offsetName = (src.paymentMonthOffset === 2) ? '翌々月' : ((src.paymentMonthOffset === 0) ? '当月' : '翌月');
+
+          // 口座ごとの引落日説明テキスト
+          const scheduleDescription = src.type === 'CREDIT' 
+            ? `締め日: <span class="font-medium text-slate-700">${src.closingDay === 99 ? '月末' : src.closingDay + '日'}</span> ｜ 引落日: <span class="font-bold text-slate-800">${month}月${displayDay}日</span> <span class="text-slate-400 text-[10px]">(${offsetName}${src.paymentDay === 99 ? '末日' : src.paymentDay + '日'}払い)</span>`
+            : `引落日: <span class="font-semibold text-teal-800">各明細の指定日に引き落とし（口座振替）</span>`;
 
           return `
             <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <div class="p-4 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-2.5">
                   <span class="text-[10px] px-2 py-0.5 rounded font-bold ${src.type === 'CREDIT' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-teal-50 text-teal-700 border border-teal-200'}">
-                    ${src.type === 'CREDIT' ? 'クレジットカード' : '銀行振替'}
+                    ${src.type === 'CREDIT' ? 'クレジットカード' : '銀行口座振替'}
                   </span>
                   <div>
                     <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
                       ${src.name}
                     </h3>
                     <p class="text-[11px] text-slate-500 mt-0.5">
-                      ${src.type === 'CREDIT' ? `締め日: <span class="font-medium text-slate-700">${src.closingDay === 99 ? '月末' : src.closingDay + '日'}</span> ｜ ` : ''}引落日: <span class="font-bold text-slate-800">${month}月${displayDay}日</span>
-                      ${src.type === 'CREDIT' ? `<span class="text-slate-400 text-[10px]">(${offsetName}${src.paymentDay === 99 ? '末日' : src.paymentDay + '日'}払い)</span>` : ''}
+                      ${scheduleDescription}
                     </p>
                   </div>
                 </div>
@@ -1104,8 +1133,8 @@
                 <table class="w-full text-left text-xs">
                   <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
                     <tr>
-                      <th class="p-3 w-32">利用日 / 区分</th>
-                      <th class="p-3">品目 / メモ</th>
+                      <th class="p-3 w-36">${src.type === 'CREDIT' ? '利用日' : '引落指定日'}</th>
+                      <th class="p-3">品目 / 内容</th>
                       <th class="p-3 text-right w-28">金額</th>
                       <th class="p-3 text-center w-14">操作</th>
                     </tr>
@@ -1129,12 +1158,14 @@
           const [pY, pM] = dueInfo ? dueInfo.payMonth.split("-") : ["", ""];
           const pD = dueInfo ? dueInfo.payDate.split("-")[2] : "";
 
+          const payDateLabel = dueInfo ? `${Number(pM)}月${Number(pD)}日` : '-';
+
           return `
             <div class="bg-white border ${isHit ? 'border-amber-400 ring-2 ring-amber-100 bg-amber-50/20' : 'border-slate-200'} rounded-xl p-4 flex flex-col justify-between shadow-sm">
               <div>
                 <div class="flex justify-between items-center mb-1">
                   <span class="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                    ${r.frequency === 'YEARLY' ? `毎年 ${r.targetMonth}月${r.targetDay === 99 ? '末日' : r.targetDay + '日'} 利用` : `毎月 ${r.targetDay === 99 ? '末日' : r.targetDay + '日'} 利用`}
+                    ${r.frequency === 'YEARLY' ? `毎年 ${r.targetMonth}月${r.targetDay === 99 ? '末日' : r.targetDay + '日'}` : `毎月 ${r.targetDay === 99 ? '末日' : r.targetDay + '日'}`}
                   </span>
                   <div class="flex items-center gap-1">
                     <button onclick="openEditRecurringModal('${r.id}')" title="編集" class="text-slate-400 hover:text-indigo-600 font-medium px-1.5 py-0.5 rounded hover:bg-slate-100 transition">✏️ 編集</button>
@@ -1143,8 +1174,8 @@
                 </div>
                 <h4 class="font-bold text-slate-900 text-sm mt-1.5">${r.name}</h4>
                 <div class="mt-2 text-[11px] text-slate-600 space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                  <div>決済: <span class="font-semibold text-slate-800">${src ? src.name : '不明'}</span></div>
-                  <div>引落予定: <span class="font-bold text-amber-800">${pM ? Number(pM) + '月' + Number(pD) + '日' : '-'}</span></div>
+                  <div>支払元: <span class="font-semibold text-slate-800">${src ? src.name : '不明'}</span></div>
+                  <div>引落予定: <span class="font-bold text-amber-800">${payDateLabel}</span></div>
                 </div>
               </div>
               <div class="mt-3 pt-2 border-t border-slate-100 text-right">
@@ -1166,7 +1197,7 @@
               <div>
                 <div class="flex justify-between items-center mb-1">
                   <span class="text-[10px] px-2 py-0.5 rounded font-bold ${src.type === 'CREDIT' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-teal-50 text-teal-700 border border-teal-200'}">
-                    ${src.type === 'CREDIT' ? 'クレジットカード' : '銀行振替'}
+                    ${src.type === 'CREDIT' ? 'クレジットカード' : '銀行口座振替'}
                   </span>
                   <div class="flex items-center gap-1">
                     <button onclick="openEditSourceModal('${src.id}')" title="編集" class="text-slate-400 hover:text-indigo-600 font-medium px-1.5 py-0.5 rounded hover:bg-slate-100 transition">✏️ 編集</button>
@@ -1185,9 +1216,8 @@
                       <span class="font-semibold text-indigo-700">${offsetName} ${payDayText} 払い</span>
                     </div>
                   ` : `
-                    <div class="flex justify-between">
-                      <span class="text-slate-400">振替日:</span>
-                      <span class="font-semibold text-teal-700">毎月 ${payDayText}</span>
+                    <div class="text-[11px] text-teal-800 leading-relaxed">
+                      💡 固定振替日は設定不要です。明細入力時に指定した利用日がそのまま引き落とし日になります（ガス・電気・家賃など）。
                     </div>
                   `}
                 </div>
@@ -1231,7 +1261,7 @@
     function updateSelectOptions() {
       const expSelect = document.getElementById("expSourceSelect");
       const recSelect = document.getElementById("recSourceSelect");
-      const opts = sources.map(s => `<option value="${s.id}">${s.name} (${s.type === 'CREDIT' ? 'クレカ' : '銀行振替'})</option>`).join("");
+      const opts = sources.map(s => `<option value="${s.id}">${s.name} (${s.type === 'CREDIT' ? 'クレカ' : '口座振替'})</option>`).join("");
       if (expSelect) expSelect.innerHTML = opts;
       if (recSelect) recSelect.innerHTML = opts;
     }
@@ -1309,21 +1339,6 @@
         optEnd.value = 99;
         optEnd.innerText = `末日払い`;
         paySelect.appendChild(optEnd);
-      }
-
-      const bankSelect = document.getElementById("srcBankPaySelect");
-      if (bankSelect && bankSelect.children.length === 0) {
-        for (let i = 1; i <= 28; i++) {
-          const opt = document.createElement("option");
-          opt.value = i;
-          opt.innerText = `毎月 ${i} 日`;
-          if (i === 25) opt.selected = true;
-          bankSelect.appendChild(opt);
-        }
-        const optEnd = document.createElement("option");
-        optEnd.value = 99;
-        optEnd.innerText = `毎月末日`;
-        bankSelect.appendChild(optEnd);
       }
 
       const recDaySelect = document.getElementById("recDaySelect");
