@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>まにゃーまにゃー</title>
-  <!-- ファビコン設定 -->
   <link rel="icon" href="favicon.ico" type="image/x-icon">
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -16,21 +15,18 @@
     }
   </style>
 
-  <!-- Firebase SDK (Compat version) -->
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen pb-16">
 
-  <!-- ヘッダー：タイトル、クラウド状態、明細入力ボタン -->
   <header class="border-b border-slate-200 bg-white sticky top-0 z-30 px-4 py-3 shadow-sm">
     <div class="max-w-4xl mx-auto flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <h1 class="font-black text-xl text-slate-900 flex items-center gap-1.5">
           まにゃーまにゃー
         </h1>
-        <!-- クラウド同期ステータスバッジ -->
         <button onclick="openCloudModal()" id="cloudStatusBadge" class="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition">
           <span id="cloudStatusDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
           <span id="cloudStatusText">接続確認中...</span>
@@ -38,12 +34,10 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <!-- スマホ用クラウド設定ボタン -->
-        <button onclick="openCloudModal()" class="sm:hidden p-2 text-slate-500 hover:text-slate-800 rounded-xl bg-slate-100 border border-slate-200" title="クラウド同期・共有設定">
+        <button onclick="openCloudModal()" class="sm:hidden p-2 text-slate-500 hover:text-slate-800 rounded-xl bg-slate-100 border border-slate-200" title="Google認証・家族共有設定">
           ☁️
         </button>
 
-        <!-- 明細入力ボタン -->
         <button onclick="openExpenseModalWithSource()" class="px-5 py-2.5 text-sm font-black rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20 flex items-center gap-1 active:scale-95 transition">
           <span class="text-lg leading-none">＋</span> 明細入力
         </button>
@@ -53,13 +47,11 @@
 
   <main class="max-w-4xl mx-auto p-4 space-y-5">
 
-    <!-- 自動保存トースト通知 -->
     <div id="saveToast" class="transition-all duration-300 opacity-0 translate-y-2 fixed bottom-4 right-4 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs shadow-xl flex items-center gap-2 pointer-events-none">
       <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
       <span id="saveToastText">自動保存しました</span>
     </div>
 
-    <!-- 月選択 & 総額表示パネル -->
     <div class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
       <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-3">
@@ -83,7 +75,6 @@
         </div>
       </div>
 
-      <!-- 引き落とし予定総額の内訳（カード・口座ごとの日付＆金額） -->
       <div class="pt-3 border-t border-slate-100">
         <div class="text-[11px] font-semibold text-slate-500 mb-2 flex items-center gap-1.5">
           <span>📅</span> カード・口座別の引き落とし予定日
@@ -91,14 +82,12 @@
         <div id="topSourceDueList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5"></div>
       </div>
 
-      <!-- 年払い発生アラート -->
       <div id="recurringAlertBox" class="bg-amber-50 border border-amber-300 rounded-xl p-3 text-xs text-amber-900 hidden">
         <span class="font-bold text-amber-800">⚠️【年払い・定期支払いの引落月】</span>
         <span id="recurringAlertText"></span>
       </div>
     </div>
 
-    <!-- タブ切り替えボタン -->
     <div class="flex border-b border-slate-200 text-xs font-semibold gap-4">
       <button onclick="switchTab('expenses')" id="tabBtn-expenses" class="pb-2.5 border-b-2 border-indigo-600 text-indigo-600">
         当月の利用明細（カード・口座別）
@@ -111,10 +100,8 @@
       </button>
     </div>
 
-    <!-- タブ1: カード・口座別 統合明細リスト -->
     <div id="tabContent-expenses" class="space-y-4"></div>
 
-    <!-- タブ2: 年払い・固定費一覧 -->
     <div id="tabContent-recurring" class="space-y-4 hidden">
       <div class="flex justify-between items-center bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
         <span class="text-xs text-slate-500">年1回や毎月決まった固定費を登録できます。</span>
@@ -125,7 +112,6 @@
       <div id="recurringListContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5"></div>
     </div>
 
-    <!-- タブ3: カード・口座の管理 -->
     <div id="tabContent-sources" class="space-y-4 hidden">
       <div class="flex justify-between items-center bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
         <span class="text-xs text-slate-500">カードの並び順（▲▼ボタン）や締め日・支払日ルールを管理できます。</span>
@@ -136,17 +122,15 @@
       <div id="sourcesListContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5"></div>
     </div>
 
-    <!-- 下部：メニュー・データ管理 -->
     <div class="pt-4 border-t border-slate-200 space-y-3">
       <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
         <div class="flex items-center justify-between">
           <div class="text-xs font-bold text-slate-700">⚙️ メニュー・データ管理</div>
           <button onclick="openCloudModal()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-            ☁️ 端末同期＆パスコード設定
+            ☁️ Google認証＆同期設定
           </button>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <!-- 下部に配置した DL / UL ボタン -->
           <button onclick="exportDataToFile()" class="px-3 py-2 text-xs font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center gap-1 transition active:scale-95">
             💾 DL (保存)
           </button>
@@ -157,7 +141,6 @@
 
           <div class="h-4 w-px bg-slate-300 mx-1 hidden sm:block"></div>
 
-          <!-- 各種追加ボタン -->
           <button onclick="openCreateSourceModal()" class="px-3 py-2 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition">
             ＋ 口座・カードを追加
           </button>
@@ -177,72 +160,79 @@
 
   </main>
 
-  <!-- モーダル: クラウド同期 & パスコード設定 -->
   <div id="cloudModal" class="modal-overlay fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 space-y-4 text-xs shadow-2xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
       <div class="flex justify-between items-center border-b border-slate-100 pb-2">
         <h3 class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-          ☁️ 端末同期 ＆ パスコード認証
+          ☁️ Google認証 ＆ クラウド同期設定
         </h3>
         <button onclick="closeModal('cloudModal')" class="text-slate-400 hover:text-slate-700 text-base">✕</button>
       </div>
 
-      <!-- 接続診断パネル -->
       <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
         <div class="flex items-center justify-between">
           <span class="font-bold text-slate-700 text-[11px] flex items-center gap-1">
-            <span>🔍</span> クラウド接続＆権限診断
+            <span>🔍</span> クラウド同期・接続診断
           </span>
           <button onclick="runFullCloudDiagnostic()" class="text-[10px] font-bold text-indigo-600 hover:underline">
             再診断を実行
           </button>
         </div>
         <div id="cloudDiagText" class="text-[11px] font-mono leading-relaxed text-slate-700 break-words bg-white p-2.5 rounded-lg border border-slate-200 whitespace-pre-line">
-          診断を実行中...
+          接続確認中...
         </div>
       </div>
 
-      <!-- セクション1: 自分の複数端末同期（マイ・パスコード） -->
       <div class="p-3.5 bg-indigo-50/70 rounded-xl border border-indigo-200 space-y-2.5">
         <div class="flex items-center justify-between">
           <div class="font-bold text-indigo-950 text-xs flex items-center gap-1.5">
-            <span>📱💻</span> 自分の端末同期（マイ・パスコード）
+            <span>👤</span> Googleアカウント同期
           </div>
-          <span id="passcodeBadge" class="text-[10px] px-2 py-0.5 rounded font-bold bg-slate-200 text-slate-600">未設定</span>
+          <span id="googleAuthBadge" class="text-[10px] px-2 py-0.5 rounded font-bold bg-slate-200 text-slate-600">未ログイン</span>
         </div>
+        
         <p class="text-[11px] text-indigo-900 leading-relaxed">
-          スマホとPCなど、<strong>あなた自身の複数端末でまったく同じデータを同期</strong>させるためのパスコードです。<br>
-          両方の端末で同じコードを入力して「設定/同期」を押してください。
+          許可されたGoogleアカウント（<strong>y37y37@gmail.com</strong> / <strong>nuri0215@gmail.com</strong>）のみ同期可能です。
         </p>
 
-        <div>
-          <label class="text-[10px] font-bold text-indigo-900 block mb-1">マイ・パスコード (英数字・4文字以上)</label>
-          <div class="flex gap-1.5">
-            <input type="text" id="myPasscodeInput" placeholder="例: mycat-7788" class="flex-1 bg-white border border-indigo-300 rounded-lg p-2 text-slate-800 text-xs font-mono focus:outline-none focus:border-indigo-600">
-            <button onclick="handleApplyMyPasscode()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shrink-0 active:scale-95 transition">
-              設定/同期
+        <div id="googleLoggedInView" class="hidden space-y-2 bg-white p-3 rounded-lg border border-indigo-200">
+          <div class="flex items-center gap-2.5">
+            <img id="userPhoto" src="" class="w-8 h-8 rounded-full border border-slate-200 object-cover hidden">
+            <div class="min-w-0">
+              <div id="userName" class="font-bold text-slate-800 text-xs truncate"></div>
+              <div id="userEmail" class="text-[10px] text-slate-500 font-mono truncate"></div>
+            </div>
+          </div>
+          <div class="flex gap-2 pt-1">
+            <button onclick="fetchLatestFromCloud()" class="flex-1 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded-lg text-[11px] transition">
+              🔄 クラウドから再取得
+            </button>
+            <button onclick="handleGoogleSignOut()" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-lg text-[11px] transition">
+              ログアウト
             </button>
           </div>
         </div>
 
-        <div class="flex gap-2 pt-1">
-          <button onclick="fetchLatestFromCloud()" class="flex-1 py-2 bg-white border border-indigo-300 hover:bg-indigo-50 text-indigo-700 font-bold rounded-lg text-[11px] transition shadow-sm">
-            🔄 クラウドから最新を取得
-          </button>
-          <button onclick="forceUploadToCloud()" class="flex-1 py-2 bg-white border border-indigo-300 hover:bg-indigo-50 text-indigo-700 font-bold rounded-lg text-[11px] transition shadow-sm">
-            ⬆️ この端末の内容を送信
+        <div id="googleLoggedOutView" class="pt-1">
+          <button onclick="handleGoogleSignIn()" class="w-full py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 active:scale-95 transition">
+            <svg class="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            Googleアカウントでログインして同期
           </button>
         </div>
       </div>
 
-      <!-- セクション2: 家族・パートナーとの特定カード共有（家族合言葉） -->
       <div class="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200 space-y-2.5">
         <div class="font-bold text-amber-950 text-xs flex items-center gap-1.5">
           <span>🤝</span> 家族・パートナーとの特定カード共有
         </div>
         <p class="text-[11px] text-amber-900 leading-relaxed">
           家族やパートナーと<strong>「共有」に設定した特定のカード・明細だけをシェア</strong>します。<br>
-          異なるマイ・パスコードを使っていても、この合言葉を一致させれば共有カードだけが同期されます。
+          お互い別々のアカウントを使っていても、同じ合言葉を設定すれば共有カードだけが自動同期されます。
         </p>
         <div>
           <label class="text-[10px] font-bold text-amber-900 block mb-1">家族共有合言葉 (英数字)</label>
@@ -255,24 +245,35 @@
         </div>
       </div>
 
-      <!-- セキュリティルール案内（コピー用） -->
       <div class="bg-amber-50/80 p-3 rounded-xl border border-amber-300 space-y-2">
         <div class="flex items-center justify-between">
           <div class="font-bold text-amber-950 text-[11px] flex items-center gap-1">
-            <span>⚠️</span> 同期できない場合のチェック（ルール設定）
+            <span>🛡️</span> 2アカウント限定 Firestoreセキュリティルール
           </div>
           <button onclick="copySecurityRule()" class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-200 hover:bg-amber-300 text-amber-900 transition">
             📋 ルールをコピー
           </button>
         </div>
         <p class="text-[10px] text-amber-900 leading-relaxed">
-          もし診断欄に「<strong>権限エラー (permission-denied)</strong>」と出る場合、Firebase Consoleの「Firestore」➔「ルール」タブに以下のコードを貼り付けて「公開」してください。
+          Firebase Consoleの「Firestore」➔「ルール」タブに以下のコードを貼り付けて「公開」してください。<strong>指定の2アカウント以外からのアクセスをFirestore側で完全に遮断</strong>します。
         </p>
         <pre id="securityRuleCode" class="bg-slate-900 text-emerald-300 p-2.5 rounded-lg text-[10px] overflow-x-auto select-all font-mono">rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    // 許可されたGoogleアカウントのみ通過させる関数
+    function isAllowedUser() {
+      return request.auth != null && 
+             request.auth.token.email in ['y37y37@gmail.com', 'nuri0215@gmail.com'];
+    }
+
+    // 個人の家計簿データ（許可アカウントかつ本人のUIDのみ読み書き可能）
+    match /user_vaults/{userId} {
+      allow read, write: if isAllowedUser() && request.auth.uid == userId;
+    }
+
+    // 家族合言葉の共有データ（許可された2アカウントの間でのみ読み書き可能）
+    match /shared_vaults/{sharedDocId} {
+      allow read, write: if isAllowedUser();
     }
   }
 }</pre>
@@ -284,7 +285,6 @@ service cloud.firestore {
     </div>
   </div>
 
-  <!-- モーダル: 明細入力 / 編集 -->
   <div id="expenseModal" class="modal-overlay fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-5 space-y-4 text-xs shadow-2xl" onclick="event.stopPropagation()">
       <div class="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -319,7 +319,6 @@ service cloud.firestore {
     </div>
   </div>
 
-  <!-- モーダル: 年払い・固定費登録/編集 -->
   <div id="recurringModal" class="modal-overlay fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-5 space-y-4 text-xs shadow-2xl" onclick="event.stopPropagation()">
       <div class="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -352,7 +351,6 @@ service cloud.firestore {
           </div>
         </div>
 
-        <!-- 請求・利用日設定 -->
         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
           <label class="text-slate-700 block font-semibold text-[11px]">請求・利用・引落のタイミング</label>
           <div class="grid grid-cols-2 gap-2">
@@ -385,7 +383,6 @@ service cloud.firestore {
     </div>
   </div>
 
-  <!-- モーダル: カード・口座追加/編集 -->
   <div id="sourceModal" class="modal-overlay fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-5 space-y-4 text-xs shadow-2xl" onclick="event.stopPropagation()">
       <div class="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -406,7 +403,6 @@ service cloud.firestore {
           <input type="text" id="srcNameInput" required placeholder="例: 楽天カード / 共通生活費カード / 三菱UFJ銀行" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs focus:outline-none focus:border-indigo-500">
         </div>
 
-        <!-- 共有設定切り替えスイッチ -->
         <div class="p-3 bg-amber-50/60 rounded-xl border border-amber-200 space-y-1.5">
           <div class="flex items-center justify-between">
             <span class="font-bold text-amber-950 text-[11px] flex items-center gap-1">
@@ -464,7 +460,6 @@ service cloud.firestore {
     </div>
   </div>
 
-  <!-- 安全な確認・通知用カスタムモーダル -->
   <div id="confirmModal" class="modal-overlay fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white border border-slate-200 rounded-2xl max-w-xs w-full p-5 space-y-4 text-xs shadow-2xl text-center" onclick="event.stopPropagation()">
       <div id="confirmModalIcon" class="text-3xl">⚠️</div>
@@ -478,8 +473,13 @@ service cloud.firestore {
 
   <script>
     const STORAGE_KEY = "moneymoney_app_data_v1";
-    const MY_PASSCODE_STORAGE = "manyamanya_my_passcode";
     const SHARED_KEY_STORAGE = "manyamanya_shared_passphrase";
+
+    // 許可されたGoogleアカウント一覧（ホワイトリスト）
+    const ALLOWED_EMAILS = [
+      "y37y37@gmail.com",
+      "nuri0215@gmail.com"
+    ];
 
     // --- Firebase 設定 ---
     const firebaseConfig = {
@@ -493,18 +493,15 @@ service cloud.firestore {
 
     let db = null;
     let auth = null;
+    let currentUser = null;
     let isCloudReady = false;
     let lastDiagMessage = "接続確認中...";
 
-    // パスコード・合言葉
-    let myPasscode = "";
+    // 家族共有合言葉
     let sharedPassphrase = "";
-
     try {
-      myPasscode = localStorage.getItem(MY_PASSCODE_STORAGE) || "";
       sharedPassphrase = localStorage.getItem(SHARED_KEY_STORAGE) || "";
     } catch(e) {
-      myPasscode = "";
       sharedPassphrase = "";
     }
 
@@ -583,15 +580,39 @@ service cloud.firestore {
         diagEl.innerText = lastDiagMessage;
       }
 
-      const badge = document.getElementById("passcodeBadge");
-      if (badge) {
-        if (myPasscode.trim()) {
-          badge.className = "text-[10px] px-2 py-0.5 rounded font-bold bg-indigo-100 text-indigo-700 border border-indigo-200";
-          badge.innerText = `設定済 (${myPasscode})`;
-        } else {
-          badge.className = "text-[10px] px-2 py-0.5 rounded font-bold bg-slate-200 text-slate-600";
-          badge.innerText = "未設定";
+      const authBadge = document.getElementById("googleAuthBadge");
+      const loggedInView = document.getElementById("googleLoggedInView");
+      const loggedOutView = document.getElementById("googleLoggedOutView");
+
+      if (currentUser) {
+        if (authBadge) {
+          authBadge.className = "text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 border border-emerald-300";
+          authBadge.innerText = "同期中 (Googleログイン済)";
         }
+        if (loggedInView) loggedInView.classList.remove("hidden");
+        if (loggedOutView) loggedOutView.classList.add("hidden");
+
+        const nameEl = document.getElementById("userName");
+        const emailEl = document.getElementById("userEmail");
+        const photoEl = document.getElementById("userPhoto");
+
+        if (nameEl) nameEl.innerText = currentUser.displayName || "Googleユーザー";
+        if (emailEl) emailEl.innerText = currentUser.email || "";
+        if (photoEl) {
+          if (currentUser.photoURL) {
+            photoEl.src = currentUser.photoURL;
+            photoEl.classList.remove("hidden");
+          } else {
+            photoEl.classList.add("hidden");
+          }
+        }
+      } else {
+        if (authBadge) {
+          authBadge.className = "text-[10px] px-2 py-0.5 rounded font-bold bg-slate-200 text-slate-600";
+          authBadge.innerText = "未ログイン (端末のみ保存)";
+        }
+        if (loggedInView) loggedInView.classList.add("hidden");
+        if (loggedOutView) loggedOutView.classList.remove("hidden");
       }
     }
 
@@ -708,8 +729,7 @@ service cloud.firestore {
     function saveToLocalCache() {
       try {
         const payload = {
-          version: "3.3-diagnostic",
-          myPasscode,
+          version: "4.0-google-auth",
           sharedPassphrase,
           personal: { sources: personalSources, expenses: personalExpenses, recurringList: personalRecurring },
           shared: { sources: sharedSources, expenses: sharedExpenses, recurringList: sharedRecurring }
@@ -745,24 +765,19 @@ service cloud.firestore {
     async function syncToCloud(showToast = true) {
       saveToLocalCache();
 
-      if (!isCloudReady || !db) {
-        if (showToast) showSaveToast("端末内に保存しました");
-        return;
-      }
-
-      if (!myPasscode.trim()) {
-        if (showToast) showSaveToast("端末内に保存しました（パスコード未設定）");
+      if (!isCloudReady || !db || !currentUser) {
+        if (showToast) showSaveToast("端末内に保存しました（未ログイン）");
         return;
       }
 
       updateCloudStatusUI('syncing', 'クラウド保存中...');
 
       try {
-        const personalDocId = getSafeDocId("user", myPasscode.trim());
-        await db.collection("passcode_vaults").doc(personalDocId).set({
+        await db.collection("user_vaults").doc(currentUser.uid).set({
           sources: personalSources,
           expenses: personalExpenses,
           recurringList: personalRecurring,
+          userEmail: currentUser.email || "",
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
@@ -776,14 +791,14 @@ service cloud.firestore {
           });
         }
 
-        const msg = `✅ クラウド接続＆同期 成功\nマイ・パスコード: ${myPasscode}\n最終送信: ${new Date().toLocaleTimeString()}`;
-        updateCloudStatusUI('online', '全端末同期中', msg);
+        const msg = `✅ クラウド接続＆同期 成功\nアカウント: ${currentUser.email}\n最終送信: ${new Date().toLocaleTimeString()}`;
+        updateCloudStatusUI('online', 'Google同期中', msg);
         if (showToast) showSaveToast("クラウドと同期しました");
       } catch (err) {
         console.error("Firestore同期エラー:", err);
         let errorMsg = `❌ 保存失敗: ${err.message}`;
         if (err.code === 'permission-denied') {
-          errorMsg = "❌ 権限エラー (permission-denied)\nFirebase ConsoleのFirestore「ルール」で書き込みが拒否されています。\n下部の案内枠にあるセキュリティルールをFirestoreに貼り付けて「公開」してください。";
+          errorMsg = "❌ 権限エラー (permission-denied)\nFirestore側で書き込みが拒否されました。\n許可された2アカウント（y37y37@gmail.com / nuri0215@gmail.com）でログインしているかご確認ください。";
         }
         updateCloudStatusUI('error', '同期エラー', errorMsg);
         if (showToast) showSaveToast("端末内に一時保存しました（ルール要確認）");
@@ -796,9 +811,8 @@ service cloud.firestore {
       if (unsubscribePersonal) { unsubscribePersonal(); unsubscribePersonal = null; }
       if (unsubscribeShared) { unsubscribeShared(); unsubscribeShared = null; }
 
-      if (myPasscode.trim()) {
-        const personalDocId = getSafeDocId("user", myPasscode.trim());
-        unsubscribePersonal = db.collection("passcode_vaults").doc(personalDocId)
+      if (currentUser) {
+        unsubscribePersonal = db.collection("user_vaults").doc(currentUser.uid)
           .onSnapshot((doc) => {
             if (doc.exists) {
               const d = doc.data();
@@ -807,19 +821,19 @@ service cloud.firestore {
               personalRecurring = d.recurringList || [];
               mergeAndRefreshData();
               saveToLocalCache();
-              updateCloudStatusUI('online', '全端末同期中', `✅ クラウド同期中\nマイ・パスコード: ${myPasscode}\n最新受信: ${new Date().toLocaleTimeString()}`);
+              updateCloudStatusUI('online', 'Google同期中', `✅ クラウド同期中\nアカウント: ${currentUser.email}\n最新受信: ${new Date().toLocaleTimeString()}`);
             }
           }, (err) => {
             console.warn("個人リスナー警告:", err);
             let msg = `⚠️ 受信エラー: ${err.message}`;
             if (err.code === 'permission-denied') {
-              msg = "❌ 受信拒否 (permission-denied)\nFirestoreのルール設定で読み取りが拒否されています。下部のルール設定をご確認ください。";
+              msg = "❌ 受信拒否 (permission-denied)\nFirestoreルール設定で読み取りが拒否されています。";
             }
             updateCloudStatusUI('error', '受信エラー', msg);
           });
       }
 
-      if (sharedPassphrase.trim()) {
+      if (currentUser && sharedPassphrase.trim()) {
         const sharedDocId = getSafeDocId("share", sharedPassphrase.trim());
         unsubscribeShared = db.collection("shared_vaults").doc(sharedDocId)
           .onSnapshot((doc) => {
@@ -837,16 +851,75 @@ service cloud.firestore {
       }
     }
 
-    async function testFirestorePermissions() {
-      if (!db) return false;
-      try {
-        const testRef = db.collection("passcode_vaults").doc("_connection_test_ping");
-        await testRef.set({ ping: Date.now() });
-        await testRef.get();
-        return { ok: true };
-      } catch (err) {
-        return { ok: false, error: err };
+    async function handleGoogleSignIn() {
+      if (!auth) {
+        customConfirm("Firebaseが初期化されていません。接続診断をご確認ください。", null, true);
+        return;
       }
+      const provider = new firebase.auth.GoogleAuthProvider();
+      try {
+        updateCloudStatusUI('syncing', 'Google認証中...');
+        const result = await auth.signInWithPopup(provider);
+        const signedInUser = result.user;
+
+        // 【フロントエンド側ガード】許可されたメールアドレスか判定
+        const userEmail = (signedInUser.email || "").toLowerCase();
+        if (!ALLOWED_EMAILS.includes(userEmail)) {
+          await auth.signOut();
+          currentUser = null;
+          updateCloudStatusUI('offline', '未ログイン (端末のみ保存)', `❌ アクセス拒否: ${userEmail}`);
+          customConfirm(`申し訳ありませんが、Googleアカウント【${userEmail}】はこの家計簿アプリの利用を許可されていません。\n許可された2アカウントでお試しください。`, null, true);
+          return;
+        }
+
+        currentUser = signedInUser;
+
+        const docRef = db.collection("user_vaults").doc(currentUser.uid);
+        const doc = await docRef.get();
+        if (doc.exists) {
+          const d = doc.data();
+          personalSources = d.sources || [];
+          personalExpenses = d.expenses || [];
+          personalRecurring = d.recurringList || [];
+          mergeAndRefreshData();
+          saveToLocalCache();
+          showSaveToast("クラウド上のデータと接続・同期しました！");
+        } else {
+          await syncToCloud(false);
+          showSaveToast("Googleアカウントにデータを紐付けました！");
+        }
+
+        setupCloudListeners();
+        updateCloudStatusUI('online', 'Google同期中', `✅ ログイン成功: ${currentUser.email}`);
+      } catch (err) {
+        console.error("Googleログインエラー:", err);
+        let msg = `❌ ログイン失敗: ${err.message}`;
+        if (err.code === 'auth/popup-closed-by-user') {
+          msg = "ログインウィンドウが閉じられました。";
+        } else if (err.code === 'auth/operation-not-allowed') {
+          msg = "Firebase Console ➔ Authentication ➔ 「Sign-in method」で「Google」を有効にしてください。";
+        } else if (err.code === 'auth/unauthorized-domain') {
+          msg = "このドメインはFirebaseで許可されていません。Authentication ➔ 「設定」 ➔ 「承認済みドメイン」にこのURLのドメインを追加してください。";
+        }
+        customConfirm(msg, null, true);
+        updateCloudStatusUI(currentUser ? 'online' : 'offline', currentUser ? 'Google同期中' : '未ログイン', msg);
+      }
+    }
+
+    async function handleGoogleSignOut() {
+      customConfirm("ログアウトしますか？\n（ログアウト後は端末のローカルキャッシュのみ参照されます）", async (ok) => {
+        if (!ok) return;
+        try {
+          if (unsubscribePersonal) { unsubscribePersonal(); unsubscribePersonal = null; }
+          if (unsubscribeShared) { unsubscribeShared(); unsubscribeShared = null; }
+          await auth.signOut();
+          currentUser = null;
+          updateCloudStatusUI('offline', '未ログイン (端末のみ保存)', 'ログアウトしました');
+          showSaveToast("ログアウトしました");
+        } catch (err) {
+          customConfirm("ログアウト処理中にエラーが発生しました: " + err.message, null, true);
+        }
+      });
     }
 
     async function runFullCloudDiagnostic() {
@@ -863,49 +936,28 @@ service cloud.firestore {
         }
         auth = firebase.auth();
         db = firebase.firestore();
-
-        const userCredential = await auth.signInAnonymously();
-        const uid = userCredential.user.uid;
         isCloudReady = true;
 
-        const permResult = await testFirestorePermissions();
-
-        if (!permResult.ok) {
-          if (permResult.error.code === 'permission-denied') {
-            const msg = `⚠️ 認証は成功していますが、Firestoreのルールで拒否されました。\n(UID: ${uid.slice(0, 8)}...)\n\n【対応策】Firebase ConsoleのFirestore「ルール」タブを開き、下部の黄色い枠にあるルールを貼り付けて「公開」ボタンを押してください。`;
-            updateCloudStatusUI('error', 'ルール設定要変更', msg);
-            return;
+        if (currentUser) {
+          let okMsg = `✅ 1. Firebase初期化: 正常\n✅ 2. 許可ユーザー: ${currentUser.email}\n✅ 3. UID: ${currentUser.uid.slice(0, 8)}...`;
+          if (sharedPassphrase.trim()) {
+            okMsg += `\n✅ 4. 家族合言葉「${sharedPassphrase}」で共有中`;
           } else {
-            const msg = `❌ Firestore接続エラー:\n${permResult.error.message}`;
-            updateCloudStatusUI('error', 'Firestoreエラー', msg);
-            return;
+            okMsg += `\nℹ️ 4. 家族合言葉は未設定（個人利用のみ）`;
           }
-        }
-
-        let okMsg = `✅ 1. 匿名認証: 成功 (UID: ${uid.slice(0, 8)}...)\n✅ 2. データベース読み書き: 正常`;
-        if (myPasscode.trim()) {
-          okMsg += `\n✅ 3. マイ・パスコード「${myPasscode}」で同期待機中`;
+          updateCloudStatusUI('online', 'Google同期中', okMsg);
+          setupCloudListeners();
         } else {
-          okMsg += `\n⚠️ 3. マイ・パスコードが未設定です。下段で設定してください。`;
+          const msg = `✅ 1. Firebase初期化: 正常\n⚠️ 2. Googleアカウント: 未ログイン\n端末内のみで保存されています。\n許可アカウント: y37y37@gmail.com / nuri0215@gmail.com`;
+          updateCloudStatusUI('offline', '未ログイン', msg);
         }
-
-        updateCloudStatusUI('online', myPasscode.trim() ? '全端末同期中' : '同期設定待機中', okMsg);
-        setupCloudListeners();
-
       } catch (error) {
         console.error("診断エラー:", error);
-        let detail = `❌ 接続失敗: ${error.message}`;
-        if (error.code === 'auth/operation-not-allowed') {
-          detail = "❌ 匿名認証が無効です\nFirebase Console ➔ Authentication ➔ 「ログイン方法」で「匿名」を有効にしてください。";
-        }
-        updateCloudStatusUI('error', '接続エラー', detail);
+        updateCloudStatusUI('error', '接続エラー', `❌ 初期化失敗: ${error.message}`);
       }
     }
 
     function openCloudModal() {
-      const passInput = document.getElementById("myPasscodeInput");
-      if (passInput) passInput.value = myPasscode;
-
       const shareInput = document.getElementById("sharedPassphraseInput");
       if (shareInput) shareInput.value = sharedPassphrase;
 
@@ -914,26 +966,19 @@ service cloud.firestore {
     }
 
     async function fetchLatestFromCloud(showToast = true) {
-      if (!myPasscode.trim()) {
-        customConfirm("マイ・パスコードを設定してください。", null, true);
+      if (!currentUser) {
+        customConfirm("Googleアカウントでログインしてください。", null, true);
         return;
       }
 
       updateCloudStatusUI('syncing', 'データ取得中...');
       try {
-        const personalDocId = getSafeDocId("user", myPasscode.trim());
-        const doc = await db.collection("passcode_vaults").doc(personalDocId).get();
-
+        const doc = await db.collection("user_vaults").doc(currentUser.uid).get();
         if (doc.exists) {
           const d = doc.data();
           personalSources = d.sources || [];
           personalExpenses = d.expenses || [];
           personalRecurring = d.recurringList || [];
-        } else {
-          if (showToast) {
-            customConfirm(`クラウド上にパスコード「${myPasscode}」のデータがまだありません。\n「この端末の内容を送信」を押して登録してください。`, null, true);
-            return;
-          }
         }
 
         if (sharedPassphrase.trim()) {
@@ -949,7 +994,7 @@ service cloud.firestore {
 
         mergeAndRefreshData();
         saveToLocalCache();
-        updateCloudStatusUI('online', '全端末同期中', `✅ 最新データ取得完了 (${new Date().toLocaleTimeString()})\nパスコード: ${myPasscode}`);
+        updateCloudStatusUI('online', 'Google同期中', `✅ 最新データ取得完了 (${new Date().toLocaleTimeString()})\nアカウント: ${currentUser.email}`);
         if (showToast) showSaveToast("クラウドから最新データを受信しました！");
       } catch (err) {
         console.error("データ取得エラー:", err);
@@ -962,72 +1007,6 @@ service cloud.firestore {
       }
     }
 
-    async function forceUploadToCloud() {
-      if (!myPasscode.trim()) {
-        customConfirm("マイ・パスコードを設定してください。", null, true);
-        return;
-      }
-      customConfirm(`この端末の家計簿データをクラウド（パスコード: ${myPasscode}）へ上書き送信しますか？`, async (ok) => {
-        if (!ok) return;
-        await syncToCloud(true);
-      });
-    }
-
-    async function handleApplyMyPasscode() {
-      const input = document.getElementById("myPasscodeInput");
-      const val = input.value.trim();
-
-      if (!val) {
-        customConfirm("マイ・パスコードを解除しますか？\n（以後はこの端末ローカルのみに保存されます）", (ok) => {
-          if (!ok) return;
-          myPasscode = "";
-          try { localStorage.removeItem(MY_PASSCODE_STORAGE); } catch(e) {}
-          if (unsubscribePersonal) { unsubscribePersonal(); unsubscribePersonal = null; }
-          updateCloudStatusUI('online', 'クラウド待機中 (パスコード未設定)', 'マイ・パスコードが解除されました');
-          closeModal('cloudModal');
-          showSaveToast("パスコードを解除しました");
-        });
-        return;
-      }
-
-      if (val.length < 4) {
-        customConfirm("パスコードは4文字以上の英数字で入力してください。", null, true);
-        return;
-      }
-
-      myPasscode = val;
-      try { localStorage.setItem(MY_PASSCODE_STORAGE, val); } catch(e) {}
-
-      if (isCloudReady && db) {
-        try {
-          const personalDocId = getSafeDocId("user", myPasscode);
-          const doc = await db.collection("passcode_vaults").doc(personalDocId).get();
-
-          if (doc.exists) {
-            const d = doc.data();
-            personalSources = d.sources || [];
-            personalExpenses = d.expenses || [];
-            personalRecurring = d.recurringList || [];
-            mergeAndRefreshData();
-            saveToLocalCache();
-            showSaveToast("クラウド上のデータと接続・同期しました！");
-          } else {
-            await syncToCloud(false);
-            showSaveToast("新しいパスコードとしてクラウドに登録しました！");
-          }
-        } catch (err) {
-          console.error("パスコード適用確認エラー:", err);
-          if (err.code === 'permission-denied') {
-            customConfirm("Firebase ConsoleのFirestore「ルール」でアクセスが拒否されました。ルール設定をご確認ください。", null, true);
-          }
-        }
-      }
-
-      setupCloudListeners();
-      closeModal('cloudModal');
-      updateCloudStatusUI('online', '全端末同期中');
-    }
-
     async function handleApplySharedPassphrase() {
       const input = document.getElementById("sharedPassphraseInput");
       const val = input.value.trim();
@@ -1035,7 +1014,7 @@ service cloud.firestore {
       sharedPassphrase = val;
       try { localStorage.setItem(SHARED_KEY_STORAGE, val); } catch(e) {}
 
-      if (val && isCloudReady && db) {
+      if (val && isCloudReady && db && currentUser) {
         try {
           const sharedDocId = getSafeDocId("share", sharedPassphrase);
           const doc = await db.collection("shared_vaults").doc(sharedDocId).get();
@@ -1427,9 +1406,9 @@ service cloud.firestore {
 
     function exportDataToFile() {
       const dataStr = JSON.stringify({
-        version: "3.3-diagnostic",
+        version: "4.0-google-auth",
         exportedAt: new Date().toISOString(),
-        myPasscode,
+        userEmail: currentUser ? currentUser.email : null,
         sharedPassphrase,
         personal: { sources: personalSources, expenses: personalExpenses, recurringList: personalRecurring },
         shared: { sources: sharedSources, expenses: sharedExpenses, recurringList: sharedRecurring }
@@ -1465,7 +1444,6 @@ service cloud.firestore {
               sharedSources = parsed.shared ? (parsed.shared.sources || []) : [];
               sharedExpenses = parsed.shared ? (parsed.shared.expenses || []) : [];
               sharedRecurring = parsed.shared ? (parsed.shared.recurringList || []) : [];
-              if (parsed.myPasscode) myPasscode = parsed.myPasscode;
               if (parsed.sharedPassphrase) sharedPassphrase = parsed.sharedPassphrase;
             } else if (parsed.sources) {
               personalSources = parsed.sources || [];
@@ -1811,7 +1789,6 @@ service cloud.firestore {
                     </span>
                     ${src.isShared ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-0.5"><span>🤝</span>共有</span>' : '<span class="text-[10px] px-1.5 py-0.5 rounded font-medium bg-slate-100 text-slate-500">個人専用</span>'}
                   </div>
-                  <!-- 並び替えボタン（▲ 上へ / ▼ 下へ）および編集・削除 -->
                   <div class="flex items-center gap-1">
                     <button onclick="moveSourceOrder('${src.id}', -1)" ${isFirst ? 'disabled' : ''} title="上へ移動" class="p-1 rounded text-xs font-bold ${isFirst ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-100 active:scale-95 transition'}">▲</button>
                     <button onclick="moveSourceOrder('${src.id}', 1)" ${isLast ? 'disabled' : ''} title="下へ移動" class="p-1 rounded text-xs font-bold ${isLast ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-100 active:scale-95 transition'}">▼</button>
@@ -2006,7 +1983,6 @@ service cloud.firestore {
     }
 
     function initModalBackdropEvents() {
-      // モーダルの背景クリックで閉じる
       document.querySelectorAll(".modal-overlay").forEach(overlay => {
         overlay.addEventListener("click", (e) => {
           if (e.target === overlay) {
@@ -2015,7 +1991,6 @@ service cloud.firestore {
         });
       });
 
-      // ESCキーでモーダルを閉じる
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
           document.querySelectorAll(".modal-overlay").forEach(m => m.classList.add("hidden"));
@@ -2047,9 +2022,32 @@ service cloud.firestore {
 
       render();
 
-      setTimeout(() => {
-        runFullCloudDiagnostic();
-      }, 50);
+      if (typeof firebase !== 'undefined') {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        auth = firebase.auth();
+        db = firebase.firestore();
+        isCloudReady = true;
+
+        auth.onAuthStateChanged(async (user) => {
+          if (user) {
+            const userEmail = (user.email || "").toLowerCase();
+            if (!ALLOWED_EMAILS.includes(userEmail)) {
+              await auth.signOut();
+              currentUser = null;
+              updateCloudStatusUI('offline', '未ログイン (端末のみ保存)', `❌ アクセス拒否: ${userEmail}`);
+              customConfirm(`Googleアカウント【${userEmail}】はこの家計簿アプリの利用を許可されていません。`, null, true);
+              return;
+            }
+            currentUser = user;
+            runFullCloudDiagnostic();
+          } else {
+            currentUser = null;
+            updateCloudStatusUI('offline', '未ログイン (端末のみ保存)');
+          }
+        });
+      }
     }
 
     if (document.readyState === "loading") {
