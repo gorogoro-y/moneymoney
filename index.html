@@ -142,7 +142,7 @@
         <div class="flex items-center justify-between">
           <div class="text-xs font-bold text-slate-700">⚙️ メニュー・データ管理</div>
           <button onclick="openCloudModal()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-            ☁️ クラウド同期 & 共有設定
+            ☁️ 端末同期＆パスコード設定
           </button>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -177,45 +177,62 @@
 
   </main>
 
-  <!-- モーダル: クラウド同期 & 共有設定 -->
+  <!-- モーダル: クラウド同期 & パスコード設定 -->
   <div id="cloudModal" class="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-5 space-y-4 text-xs shadow-2xl">
+    <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 space-y-4 text-xs shadow-2xl max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b border-slate-100 pb-2">
         <h3 class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-          ☁️ クラウド同期 & 共有設定
+          ☁️ 端末同期 ＆ パスコード認証
         </h3>
         <button onclick="closeModal('cloudModal')" class="text-slate-400 hover:text-slate-700 text-base">✕</button>
       </div>
 
-      <div class="space-y-3">
-        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-          <div class="text-[11px] font-bold text-slate-700">あなたの端末ID (個人領域)</div>
-          <div id="currentUserIdDisplay" class="font-mono text-[10px] text-slate-500 break-all select-all bg-white p-1.5 rounded border border-slate-200">
-            接続確認中...
+      <!-- セクション1: 自分の複数端末同期（マイ・パスコード） -->
+      <div class="p-3.5 bg-indigo-50/70 rounded-xl border border-indigo-200 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div class="font-bold text-indigo-950 text-xs flex items-center gap-1.5">
+            <span>📱💻</span> 自分の端末同期（マイ・パスコード）
           </div>
-          <div class="text-[10px] text-slate-400">※ この端末IDに紐づくデータはあなた専用で安全に保管されます。</div>
+          <span id="passcodeBadge" class="text-[10px] px-2 py-0.5 rounded font-bold bg-slate-200 text-slate-600">未設定</span>
         </div>
+        <p class="text-[11px] text-indigo-900 leading-relaxed">
+          スマホとPCなど、<strong>あなた自身の複数端末でまったく同じデータを同期</strong>させるための暗証キーです。<br>
+          別の端末でも同じパスコードを入力すると、自動で同じ家計簿データに繋がります。
+        </p>
 
-        <div class="p-3 bg-indigo-50/70 rounded-xl border border-indigo-200 space-y-2">
-          <div class="font-bold text-indigo-950 text-[11px] flex items-center gap-1">
-            <span>🤝</span> 家族・パートナーとの共有（合言葉）
+        <div>
+          <label class="text-[10px] font-bold text-indigo-900 block mb-1">マイ・パスコード (英数字・4文字以上)</label>
+          <div class="flex gap-1.5">
+            <input type="text" id="myPasscodeInput" placeholder="例: mypass-7788" class="flex-1 bg-white border border-indigo-300 rounded-lg p-2 text-slate-800 text-xs font-mono focus:outline-none focus:border-indigo-600">
+            <button onclick="handleApplyMyPasscode()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shrink-0 active:scale-95 transition">
+              設定/同期
+            </button>
           </div>
-          <p class="text-[10px] text-indigo-900 leading-relaxed">
-            同じ「共有合言葉」を設定したスマホ同士で、「共有」に指定したカードや明細がリアルタイムに相互同期されます。
-          </p>
-          <div>
-            <label class="text-[10px] font-bold text-indigo-900 block mb-1">現在の共有合言葉 (英数字)</label>
-            <div class="flex gap-1.5">
-              <input type="text" id="sharedPassphraseInput" placeholder="例: tanaka-family-2026" class="flex-1 bg-white border border-indigo-300 rounded-lg p-2 text-slate-800 text-xs font-mono focus:outline-none focus:border-indigo-600">
-              <button onclick="saveSharedPassphrase()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shrink-0 active:scale-95 transition">
-                適用
-              </button>
-            </div>
+          <p class="text-[10px] text-slate-500 mt-1">※ 別の端末で入力すると、その端末の家計簿がこのパスコードのデータに切り替わります。</p>
+        </div>
+      </div>
+
+      <!-- セクション2: 家族・パートナーとの特定カード共有（家族合言葉） -->
+      <div class="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200 space-y-2.5">
+        <div class="font-bold text-amber-950 text-xs flex items-center gap-1.5">
+          <span>🤝</span> 家族・パートナーとの特定カード共有
+        </div>
+        <p class="text-[11px] text-amber-900 leading-relaxed">
+          家族やパートナーと<strong>「共有」に設定した特定のカード・明細だけをシェア</strong>します。<br>
+          お互いに異なるマイ・パスコードを使っていても、この「家族合言葉」を一致させれば共有カードだけが相互同期されます。
+        </p>
+        <div>
+          <label class="text-[10px] font-bold text-amber-900 block mb-1">家族共有合言葉 (英数字)</label>
+          <div class="flex gap-1.5">
+            <input type="text" id="sharedPassphraseInput" placeholder="例: tanaka-family-2026" class="flex-1 bg-white border border-amber-300 rounded-lg p-2 text-slate-800 text-xs font-mono focus:outline-none focus:border-amber-600">
+            <button onclick="handleApplySharedPassphrase()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shrink-0 active:scale-95 transition">
+              適用
+            </button>
           </div>
         </div>
       </div>
 
-      <div class="pt-2">
+      <div class="pt-1">
         <button type="button" onclick="closeModal('cloudModal')" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg">閉じる</button>
       </div>
     </div>
@@ -355,7 +372,7 @@
             </label>
           </div>
           <p class="text-[10px] text-amber-900 leading-snug">
-            ONにすると、同じ合言葉を設定した家族の端末ともこのカードと明細が自動同期されます。OFFの場合はあなた専用になります。
+            ONにすると、同じ家族合言葉を設定した端末ともこのカードと明細が相互同期されます。OFFの場合は自分専用になります。
           </p>
         </div>
 
@@ -415,6 +432,7 @@
 
   <script>
     const STORAGE_KEY = "moneymoney_app_data_v1";
+    const MY_PASSCODE_STORAGE = "manyamanya_my_passcode";
     const SHARED_KEY_STORAGE = "manyamanya_shared_passphrase";
 
     // --- Firebase 設定 ---
@@ -429,15 +447,20 @@
 
     let db = null;
     let auth = null;
-    let currentUserUid = null;
+    let isCloudReady = false;
+
+    // パスコード・合言葉
+    let myPasscode = "";
     let sharedPassphrase = "";
+
     try {
+      myPasscode = localStorage.getItem(MY_PASSCODE_STORAGE) || "";
       sharedPassphrase = localStorage.getItem(SHARED_KEY_STORAGE) || "";
     } catch(e) {
+      myPasscode = "";
       sharedPassphrase = "";
     }
 
-    let isCloudReady = false;
     let unsubscribePersonal = null;
     let unsubscribeShared = null;
 
@@ -477,6 +500,18 @@
     let expenses = [];
     let recurringList = [];
 
+    // パスコードからFirestore用セーフIDを生成
+    function getSafeDocId(prefix, text) {
+      if (!text) return "";
+      let hash = 0;
+      for (let i = 0; i < text.length; i++) {
+        hash = ((hash << 5) - hash) + text.charCodeAt(i);
+        hash |= 0;
+      }
+      const safe = encodeURIComponent(text.toLowerCase().replace(/[\/\#\$\.\[\]]/g, "_"));
+      return `${prefix}_${Math.abs(hash)}_${safe}`.slice(0, 60);
+    }
+
     function updateCloudStatusUI(status, label) {
       const textEl = document.getElementById("cloudStatusText");
       const dotEl = document.getElementById("cloudStatusDot");
@@ -492,6 +527,17 @@
         dotEl.classList.add("bg-rose-500");
       } else {
         dotEl.classList.add("bg-slate-400");
+      }
+
+      const badge = document.getElementById("passcodeBadge");
+      if (badge) {
+        if (myPasscode.trim()) {
+          badge.className = "text-[10px] px-2 py-0.5 rounded font-bold bg-indigo-100 text-indigo-700 border border-indigo-200";
+          badge.innerText = "同期有効";
+        } else {
+          badge.className = "text-[10px] px-2 py-0.5 rounded font-bold bg-slate-200 text-slate-600";
+          badge.innerText = "未設定";
+        }
       }
     }
 
@@ -544,13 +590,15 @@
     function saveToLocalCache() {
       try {
         const payload = {
-          version: "2.0-cloud",
+          version: "3.0-passcode",
+          myPasscode,
+          sharedPassphrase,
           personal: { sources: personalSources, expenses: personalExpenses, recurringList: personalRecurring },
           shared: { sources: sharedSources, expenses: sharedExpenses, recurringList: sharedRecurring }
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       } catch (err) {
-        console.warn("キャッシュ保存エラー:", err);
+        console.warn("ローカル保存エラー:", err);
       }
     }
 
@@ -576,9 +624,10 @@
       return false;
     }
 
+    // クラウド保存処理
     async function syncToCloud(showToast = true) {
       saveToLocalCache();
-      if (!isCloudReady || !currentUserUid || !db) {
+      if (!isCloudReady || !db) {
         if (showToast) showSaveToast("端末内に保存しました");
         return;
       }
@@ -586,16 +635,21 @@
       updateCloudStatusUI('syncing', 'クラウド保存中...');
 
       try {
-        await db.collection("users").doc(currentUserUid).set({
-          sources: personalSources,
-          expenses: personalExpenses,
-          recurringList: personalRecurring,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        // 1. マイ・パスコード領域に個人データを保存
+        if (myPasscode.trim()) {
+          const personalDocId = getSafeDocId("user", myPasscode.trim());
+          await db.collection("passcode_vaults").doc(personalDocId).set({
+            sources: personalSources,
+            expenses: personalExpenses,
+            recurringList: personalRecurring,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
 
+        // 2. 共有合言葉領域に共有データを保存
         if (sharedPassphrase.trim()) {
-          const safeShareId = encodeURIComponent(sharedPassphrase.trim().toLowerCase());
-          await db.collection("shared_vaults").doc(safeShareId).set({
+          const sharedDocId = getSafeDocId("share", sharedPassphrase.trim());
+          await db.collection("shared_vaults").doc(sharedDocId).set({
             sources: sharedSources,
             expenses: sharedExpenses,
             recurringList: sharedRecurring,
@@ -603,41 +657,52 @@
           });
         }
 
-        updateCloudStatusUI('online', sharedPassphrase.trim() ? 'クラウド同期中 (共有ON)' : 'クラウド同期中 (個人)');
-        if (showToast) showSaveToast("クラウドに同期しました");
+        const statusLabel = myPasscode.trim() 
+          ? (sharedPassphrase.trim() ? '全端末同期中 (家族共有ON)' : '全端末同期中')
+          : 'クラウド同期中 (パスコード未設定)';
+
+        updateCloudStatusUI('online', statusLabel);
+        if (showToast) showSaveToast("クラウドと同期しました");
       } catch (err) {
-        console.error("クラウド同期警告:", err);
+        console.error("クラウド同期エラー:", err);
         updateCloudStatusUI('error', 'オフライン保存中');
-        if (showToast) showSaveToast("端末に保存しました");
+        if (showToast) showSaveToast("端末内に保存しました");
       }
     }
 
+    // クラウドリスナーの登録（リアルタイム自動反映）
     function setupCloudListeners() {
-      if (!db || !currentUserUid) return;
+      if (!db || !isCloudReady) return;
 
       if (unsubscribePersonal) unsubscribePersonal();
       if (unsubscribeShared) unsubscribeShared();
 
       try {
-        unsubscribePersonal = db.collection("users").doc(currentUserUid)
-          .onSnapshot((doc) => {
-            if (doc.exists) {
-              const d = doc.data();
-              personalSources = d.sources || [];
-              personalExpenses = d.expenses || [];
-              personalRecurring = d.recurringList || [];
-              mergeAndRefreshData();
-              saveToLocalCache();
-            } else {
-              syncToCloud(false);
-            }
-          }, (err) => {
-            console.warn("個人リスナー警告:", err);
-          });
+        // 1. マイ・パスコードの個人データリスナー
+        if (myPasscode.trim()) {
+          const personalDocId = getSafeDocId("user", myPasscode.trim());
+          unsubscribePersonal = db.collection("passcode_vaults").doc(personalDocId)
+            .onSnapshot((doc) => {
+              if (doc.exists) {
+                const d = doc.data();
+                personalSources = d.sources || [];
+                personalExpenses = d.expenses || [];
+                personalRecurring = d.recurringList || [];
+                mergeAndRefreshData();
+                saveToLocalCache();
+              } else {
+                // 初回作成時は現在のローカルデータをアップロード
+                syncToCloud(false);
+              }
+            }, (err) => {
+              console.warn("個人データ同期警告:", err);
+            });
+        }
 
+        // 2. 家族・パートナー共有データのリスナー
         if (sharedPassphrase.trim()) {
-          const safeShareId = encodeURIComponent(sharedPassphrase.trim().toLowerCase());
-          unsubscribeShared = db.collection("shared_vaults").doc(safeShareId)
+          const sharedDocId = getSafeDocId("share", sharedPassphrase.trim());
+          unsubscribeShared = db.collection("shared_vaults").doc(sharedDocId)
             .onSnapshot((doc) => {
               if (doc.exists) {
                 const d = doc.data();
@@ -648,11 +713,11 @@
                 saveToLocalCache();
               }
             }, (err) => {
-              console.warn("共有リスナー警告:", err);
+              console.warn("共有データ同期警告:", err);
             });
         }
       } catch (e) {
-        console.warn("リスナー初期化スキップ:", e);
+        console.warn("リスナー登録スキップ:", e);
       }
     }
 
@@ -669,41 +734,77 @@
         auth = firebase.auth();
         db = firebase.firestore();
 
-        const userCredential = await auth.signInAnonymously();
-        currentUserUid = userCredential.user.uid;
+        await auth.signInAnonymously();
         isCloudReady = true;
 
-        const uidDisplay = document.getElementById("currentUserIdDisplay");
-        if (uidDisplay) uidDisplay.innerText = currentUserUid;
+        const statusLabel = myPasscode.trim() 
+          ? (sharedPassphrase.trim() ? '全端末同期中 (家族共有ON)' : '全端末同期中')
+          : 'クラウド待機中 (パスコード未設定)';
 
-        updateCloudStatusUI('online', sharedPassphrase ? 'クラウド同期中 (共有ON)' : 'クラウド同期中 (個人)');
+        updateCloudStatusUI('online', statusLabel);
         setupCloudListeners();
       } catch (error) {
-        console.warn("Firebase接続未完了 (オフラインモードで動作):", error);
+        console.warn("Firebase接続待機 (ローカル保存優先):", error);
         updateCloudStatusUI('error', 'オフライン保存中 (設定要確認)');
       }
     }
 
     function openCloudModal() {
-      const passInput = document.getElementById("sharedPassphraseInput");
-      if (passInput) passInput.value = sharedPassphrase;
-      const uidDisplay = document.getElementById("currentUserIdDisplay");
-      if (uidDisplay && currentUserUid) uidDisplay.innerText = currentUserUid;
+      const passInput = document.getElementById("myPasscodeInput");
+      if (passInput) passInput.value = myPasscode;
+
+      const shareInput = document.getElementById("sharedPassphraseInput");
+      if (shareInput) shareInput.value = sharedPassphrase;
+
       openModal('cloudModal');
     }
 
-    function saveSharedPassphrase() {
-      const input = document.getElementById("sharedPassphraseInput");
-      const newPhrase = input.value.trim();
-      sharedPassphrase = newPhrase;
-      try {
-        localStorage.setItem(SHARED_KEY_STORAGE, newPhrase);
-      } catch(e) {}
+    // マイ・パスコードの適用
+    async function handleApplyMyPasscode() {
+      const input = document.getElementById("myPasscodeInput");
+      const val = input.value.trim();
 
-      showSaveToast(newPhrase ? "共有合言葉を設定しました" : "共有設定を解除しました");
+      if (!val) {
+        customConfirm("マイ・パスコードを解除しますか？\n（以後はこの端末ローカルのみに保存されます）", (ok) => {
+          if (!ok) return;
+          myPasscode = "";
+          try { localStorage.removeItem(MY_PASSCODE_STORAGE); } catch(e) {}
+          if (unsubscribePersonal) unsubscribePersonal();
+          updateCloudStatusUI('online', 'クラウド待機中 (パスコード未設定)');
+          closeModal('cloudModal');
+          showSaveToast("パスコードを解除しました");
+        });
+        return;
+      }
+
+      if (val.length < 4) {
+        customConfirm("パスコードは4文字以上の英数字で入力してください。", null, true);
+        return;
+      }
+
+      myPasscode = val;
+      try { localStorage.setItem(MY_PASSCODE_STORAGE, val); } catch(e) {}
+
+      showSaveToast("マイ・パスコードを設定しました！");
       setupCloudListeners();
+      await syncToCloud(false);
       closeModal('cloudModal');
-      updateCloudStatusUI('online', newPhrase ? 'クラウド同期中 (共有ON)' : 'クラウド同期中 (個人)');
+      updateCloudStatusUI('online', sharedPassphrase.trim() ? '全端末同期中 (家族共有ON)' : '全端末同期中');
+    }
+
+    // 家族共有合言葉の適用
+    async function handleApplySharedPassphrase() {
+      const input = document.getElementById("sharedPassphraseInput");
+      const val = input.value.trim();
+
+      sharedPassphrase = val;
+      try { localStorage.setItem(SHARED_KEY_STORAGE, val); } catch(e) {}
+
+      showSaveToast(val ? "家族共有合言葉を設定しました" : "家族共有合言葉を解除しました");
+      setupCloudListeners();
+      if (val) await syncToCloud(false);
+      closeModal('cloudModal');
+      updateCloudStatusUI('online', myPasscode.trim() ? (val ? '全端末同期中 (家族共有ON)' : '全端末同期中') : '同期待機中');
     }
 
     function calculateDueDate(dateStr, source) {
@@ -1063,8 +1164,10 @@
 
     function exportDataToFile() {
       const dataStr = JSON.stringify({
-        version: "2.0-cloud",
+        version: "3.0-passcode",
         exportedAt: new Date().toISOString(),
+        myPasscode,
+        sharedPassphrase,
         personal: { sources: personalSources, expenses: personalExpenses, recurringList: personalRecurring },
         shared: { sources: sharedSources, expenses: sharedExpenses, recurringList: sharedRecurring }
       }, null, 2);
@@ -1099,6 +1202,8 @@
               sharedSources = parsed.shared ? (parsed.shared.sources || []) : [];
               sharedExpenses = parsed.shared ? (parsed.shared.expenses || []) : [];
               sharedRecurring = parsed.shared ? (parsed.shared.recurringList || []) : [];
+              if (parsed.myPasscode) myPasscode = parsed.myPasscode;
+              if (parsed.sharedPassphrase) sharedPassphrase = parsed.sharedPassphrase;
             } else if (parsed.sources) {
               personalSources = parsed.sources || [];
               personalExpenses = parsed.expenses || [];
@@ -1655,10 +1760,8 @@
         dateInput.value = new Date().toISOString().split("T")[0];
       }
 
-      // 画面表示を即座に描画（Firebaseの待機に依存しない）
       render();
 
-      // バックグラウンドでクラウド接続
       setTimeout(() => {
         initFirebase();
       }, 50);
