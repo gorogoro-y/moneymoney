@@ -204,7 +204,7 @@
             </div>
           </div>
           <div class="flex gap-2 pt-1">
-            <button onclick="fetchLatestFromCloud()" class="flex-1 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded-lg text-[11px] transition">
+            <button onclick="fetchLatestFromCloud(true)" class="flex-1 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded-lg text-[11px] transition">
               🔄 クラウドから再取得
             </button>
             <button onclick="handleGoogleSignOut()" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-lg text-[11px] transition">
@@ -227,12 +227,15 @@
       </div>
 
       <div class="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200 space-y-2.5">
-        <div class="font-bold text-amber-950 text-xs flex items-center gap-1.5">
-          <span>🤝</span> 家族・パートナーとの特定カード共有
+        <div class="flex items-center justify-between">
+          <div class="font-bold text-amber-950 text-xs flex items-center gap-1.5">
+            <span>🤝</span> 家族・パートナーとの特定カード共有
+          </div>
+          <span id="sharedPassphraseBadge" class="text-[10px] px-2 py-0.5 rounded font-bold bg-slate-200 text-slate-600">未設定</span>
         </div>
         <p class="text-[11px] text-amber-900 leading-relaxed">
-          家族やパートナーと<strong>「共有」に設定した特定のカード・明細だけをシェア</strong>します。<br>
-          お互い別々のアカウントを使っていても、同じ合言葉を設定すれば共有カードだけが自動同期されます。
+          「共有」設定にしたカード（初期設定の楽天カードなど）とその明細を相手のアカウントと共有します。<br>
+          <strong>2人の端末で同じ合言葉を入力して「適用」を押してください。</strong>
         </p>
         <div>
           <label class="text-[10px] font-bold text-amber-900 block mb-1">家族共有合言葉 (英数字)</label>
@@ -255,23 +258,20 @@
           </button>
         </div>
         <p class="text-[10px] text-amber-900 leading-relaxed">
-          Firebase Consoleの「Firestore」➔「ルール」タブに以下のコードを貼り付けて「公開」してください。<strong>指定の2アカウント以外からのアクセスをFirestore側で完全に遮断</strong>します。
+          Firebase Consoleの「Firestore」➔「ルール」タブに以下のコードを貼り付けて「公開」してください。
         </p>
         <pre id="securityRuleCode" class="bg-slate-900 text-emerald-300 p-2.5 rounded-lg text-[10px] overflow-x-auto select-all font-mono">rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 許可されたGoogleアカウントのみ通過させる関数
     function isAllowedUser() {
       return request.auth != null && 
              request.auth.token.email in ['y37y37@gmail.com', 'nuri0215@gmail.com'];
     }
 
-    // 個人の家計簿データ（許可アカウントかつ本人のUIDのみ読み書き可能）
     match /user_vaults/{userId} {
       allow read, write: if isAllowedUser() && request.auth.uid == userId;
     }
 
-    // 家族合言葉の共有データ（許可された2アカウントの間でのみ読み書き可能）
     match /shared_vaults/{sharedDocId} {
       allow read, write: if isAllowedUser();
     }
@@ -614,6 +614,17 @@ service cloud.firestore {
         if (loggedInView) loggedInView.classList.add("hidden");
         if (loggedOutView) loggedOutView.classList.remove("hidden");
       }
+
+      const passBadge = document.getElementById("sharedPassphraseBadge");
+      if (passBadge) {
+        if (sharedPassphrase.trim()) {
+          passBadge.className = "text-[10px] px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-800 border border-amber-300";
+          passBadge.innerText = `設定済 (${sharedPassphrase})`;
+        } else {
+          passBadge.className = "text-[10px] px-2 py-0.5 rounded font-bold bg-slate-200 text-slate-600";
+          passBadge.innerText = "未設定";
+        }
+      }
     }
 
     let toastTimeout = null;
@@ -729,7 +740,7 @@ service cloud.firestore {
     function saveToLocalCache() {
       try {
         const payload = {
-          version: "4.0-google-auth",
+          version: "4.1-sync-fix",
           sharedPassphrase,
           personal: { sources: personalSources, expenses: personalExpenses, recurringList: personalRecurring },
           shared: { sources: sharedSources, expenses: sharedExpenses, recurringList: sharedRecurring }
@@ -773,14 +784,20 @@ service cloud.firestore {
       updateCloudStatusUI('syncing', 'クラウド保存中...');
 
       try {
+        // 重要修正：user_vaults には個人用だけでなく共有カード・明細も含めて全データをバックアップする
+        // これにより、合言葉が未設定でも同一Googleアカウントの全端末で2つ目のカードも含めて完全同期される
         await db.collection("user_vaults").doc(currentUser.uid).set({
-          sources: personalSources,
-          expenses: personalExpenses,
-          recurringList: personalRecurring,
+          personalSources,
+          personalExpenses,
+          personalRecurring,
+          sharedSources,
+          sharedExpenses,
+          sharedRecurring,
           userEmail: currentUser.email || "",
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
+        // 家族合言葉がある場合は共有データコレクションにも保存してパートナーと相互同期
         if (sharedPassphrase.trim()) {
           const sharedDocId = getSafeDocId("share", sharedPassphrase.trim());
           await db.collection("shared_vaults").doc(sharedDocId).set({
@@ -811,14 +828,23 @@ service cloud.firestore {
       if (unsubscribePersonal) { unsubscribePersonal(); unsubscribePersonal = null; }
       if (unsubscribeShared) { unsubscribeShared(); unsubscribeShared = null; }
 
+      // 1. Googleアカウント個人ドキュメントのリスナー
       if (currentUser) {
         unsubscribePersonal = db.collection("user_vaults").doc(currentUser.uid)
           .onSnapshot((doc) => {
             if (doc.exists) {
               const d = doc.data();
-              personalSources = d.sources || [];
-              personalExpenses = d.expenses || [];
-              personalRecurring = d.recurringList || [];
+              personalSources = d.personalSources || d.sources || [];
+              personalExpenses = d.personalExpenses || d.expenses || [];
+              personalRecurring = d.personalRecurring || d.recurringList || [];
+
+              // 合言葉が未設定の端末でも、自分のGoogleアカウント経由で共有カード・明細を復元できるようにする
+              if (!sharedPassphrase.trim()) {
+                if (d.sharedSources) sharedSources = d.sharedSources;
+                if (d.sharedExpenses) sharedExpenses = d.sharedExpenses;
+                if (d.sharedRecurring) sharedRecurring = d.sharedRecurring;
+              }
+
               mergeAndRefreshData();
               saveToLocalCache();
               updateCloudStatusUI('online', 'Google同期中', `✅ クラウド同期中\nアカウント: ${currentUser.email}\n最新受信: ${new Date().toLocaleTimeString()}`);
@@ -833,6 +859,7 @@ service cloud.firestore {
           });
       }
 
+      // 2. 家族共有合言葉のリスナー（パートナーからの共有更新を受信）
       if (currentUser && sharedPassphrase.trim()) {
         const sharedDocId = getSafeDocId("share", sharedPassphrase.trim());
         unsubscribeShared = db.collection("shared_vaults").doc(sharedDocId)
@@ -862,7 +889,6 @@ service cloud.firestore {
         const result = await auth.signInWithPopup(provider);
         const signedInUser = result.user;
 
-        // 【フロントエンド側ガード】許可されたメールアドレスか判定
         const userEmail = (signedInUser.email || "").toLowerCase();
         if (!ALLOWED_EMAILS.includes(userEmail)) {
           await auth.signOut();
@@ -874,23 +900,11 @@ service cloud.firestore {
 
         currentUser = signedInUser;
 
-        const docRef = db.collection("user_vaults").doc(currentUser.uid);
-        const doc = await docRef.get();
-        if (doc.exists) {
-          const d = doc.data();
-          personalSources = d.sources || [];
-          personalExpenses = d.expenses || [];
-          personalRecurring = d.recurringList || [];
-          mergeAndRefreshData();
-          saveToLocalCache();
-          showSaveToast("クラウド上のデータと接続・同期しました！");
-        } else {
-          await syncToCloud(false);
-          showSaveToast("Googleアカウントにデータを紐付けました！");
-        }
-
+        // ログイン成功時にクラウド上の全データを確実に取得
+        await fetchLatestFromCloud(false);
         setupCloudListeners();
         updateCloudStatusUI('online', 'Google同期中', `✅ ログイン成功: ${currentUser.email}`);
+        showSaveToast("Googleアカウントで接続・同期しました！");
       } catch (err) {
         console.error("Googleログインエラー:", err);
         let msg = `❌ ログイン失敗: ${err.message}`;
@@ -941,9 +955,9 @@ service cloud.firestore {
         if (currentUser) {
           let okMsg = `✅ 1. Firebase初期化: 正常\n✅ 2. 許可ユーザー: ${currentUser.email}\n✅ 3. UID: ${currentUser.uid.slice(0, 8)}...`;
           if (sharedPassphrase.trim()) {
-            okMsg += `\n✅ 4. 家族合言葉「${sharedPassphrase}」で共有中`;
+            okMsg += `\n✅ 4. 家族合言葉「${sharedPassphrase}」で2人共有中`;
           } else {
-            okMsg += `\nℹ️ 4. 家族合言葉は未設定（個人利用のみ）`;
+            okMsg += `\nℹ️ 4. 家族合言葉: 未設定（個人アカウント内のみ全カード同期）`;
           }
           updateCloudStatusUI('online', 'Google同期中', okMsg);
           setupCloudListeners();
@@ -967,20 +981,26 @@ service cloud.firestore {
 
     async function fetchLatestFromCloud(showToast = true) {
       if (!currentUser) {
-        customConfirm("Googleアカウントでログインしてください。", null, true);
+        if (showToast) customConfirm("Googleアカウントでログインしてください。", null, true);
         return;
       }
 
       updateCloudStatusUI('syncing', 'データ取得中...');
       try {
+        // 1. user_vaultsから個人データ＋共有データを取得
         const doc = await db.collection("user_vaults").doc(currentUser.uid).get();
         if (doc.exists) {
           const d = doc.data();
-          personalSources = d.sources || [];
-          personalExpenses = d.expenses || [];
-          personalRecurring = d.recurringList || [];
+          personalSources = d.personalSources || d.sources || [];
+          personalExpenses = d.personalExpenses || d.expenses || [];
+          personalRecurring = d.personalRecurring || d.recurringList || [];
+
+          if (d.sharedSources) sharedSources = d.sharedSources;
+          if (d.sharedExpenses) sharedExpenses = d.sharedExpenses;
+          if (d.sharedRecurring) sharedRecurring = d.sharedRecurring;
         }
 
+        // 2. 家族合言葉があれば、共有コレクションの最新データで上書きマージ
         if (sharedPassphrase.trim()) {
           const sharedDocId = getSafeDocId("share", sharedPassphrase.trim());
           const shareDoc = await db.collection("shared_vaults").doc(sharedDocId).get();
@@ -1025,17 +1045,20 @@ service cloud.firestore {
             sharedRecurring = d.recurringList || [];
             mergeAndRefreshData();
             saveToLocalCache();
+            showSaveToast("相手の共有カードデータと接続・同期しました！");
           } else {
+            // クラウドにまだなければ現在の端末の共有カード内容を初回アップロード
             await syncToCloud(false);
+            showSaveToast("新しい家族合言葉として登録しました！");
           }
         } catch (err) {
           console.warn("共有合言葉確認警告:", err);
         }
       }
 
-      showSaveToast(val ? "家族共有合言葉を設定しました" : "家族共有合言葉を解除しました");
       setupCloudListeners();
       closeModal('cloudModal');
+      updateCloudStatusUI('online', 'Google同期中');
     }
 
     function calculateDueDate(dateStr, source) {
@@ -1296,6 +1319,21 @@ service cloud.firestore {
         personalSources.push(newSourceData);
       }
 
+      // カードの共有ON/OFF変更に合わせて、登録済み明細の共有フラグも連動更新
+      const allExpenses = [...personalExpenses, ...sharedExpenses];
+      personalExpenses = [];
+      sharedExpenses = [];
+      allExpenses.forEach(exp => {
+        const card = (exp.sourceId === newSourceData.id) ? newSourceData : sources.find(s => s.id === exp.sourceId);
+        const cardIsShared = card ? !!card.isShared : !!exp.isShared;
+        const updatedExp = { ...exp, isShared: cardIsShared };
+        if (cardIsShared) {
+          sharedExpenses.push(updatedExp);
+        } else {
+          personalExpenses.push(updatedExp);
+        }
+      });
+
       closeModal("sourceModal");
       mergeAndRefreshData();
       await syncToCloud(true);
@@ -1406,7 +1444,7 @@ service cloud.firestore {
 
     function exportDataToFile() {
       const dataStr = JSON.stringify({
-        version: "4.0-google-auth",
+        version: "4.1-sync-fix",
         exportedAt: new Date().toISOString(),
         userEmail: currentUser ? currentUser.email : null,
         sharedPassphrase,
@@ -2042,6 +2080,8 @@ service cloud.firestore {
             }
             currentUser = user;
             runFullCloudDiagnostic();
+            // 起動時に自動でクラウドから最新データを取得
+            await fetchLatestFromCloud(false);
           } else {
             currentUser = null;
             updateCloudStatusUI('offline', '未ログイン (端末のみ保存)');
