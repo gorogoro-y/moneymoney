@@ -355,6 +355,8 @@ function render() {
     if (r.frequency === "YEARLY") {
       [-1, 0, 1].forEach(offsetYear => {
         const checkYear = year + offsetYear;
+        const checkMonth = r.targetMonth || 1;
+        if (!isRecurringActiveInUseMonth(r, checkYear, checkMonth)) return;
         const dueInfo = getRecurringDueDateInfo(r, src, checkYear);
         if (dueInfo.payMonth === state.currentMonth) {
           currentRecurring.push({
@@ -372,6 +374,7 @@ function render() {
         const d = new Date(year, month - 1 + offsetMonth, 1);
         const checkYear = d.getFullYear();
         const checkMonth = d.getMonth() + 1;
+        if (!isRecurringActiveInUseMonth(r, checkYear, checkMonth)) return;
         const dummyItem = { ...r, targetMonth: checkMonth };
         const dueInfo = getRecurringDueDateInfo(dummyItem, src, checkYear);
         if (dueInfo.payMonth === state.currentMonth) {
@@ -1570,34 +1573,48 @@ function renderRecurringTab({ year, month, currentRecurring }) {
     recurringContainer.innerHTML = state.recurringList.map(r => {
       const src = state.sources.find(s => s.id === r.sourceId);
       const dueInfo = src ? getRecurringDueDateInfo(r, src, year) : null;
-      const isHit = dueInfo && dueInfo.payMonth === state.currentMonth;
+      const isEnded = Boolean(r.endMonth && state.currentMonth > r.endMonth);
+      const isNotStarted = Boolean(r.startMonth && state.currentMonth < r.startMonth);
+      const isOutOfPeriod = isEnded || isNotStarted;
+
+      const isHit = !isOutOfPeriod && dueInfo && dueInfo.payMonth === state.currentMonth;
       const [, pM] = dueInfo ? dueInfo.payMonth.split("-") : ["", ""];
       const pD = dueInfo ? dueInfo.payDate.split("-")[2] : "";
       const payDateLabel = dueInfo ? `${Number(pM)}月${Number(pD)}日` : '-';
 
+      let periodLabel = "";
+      if (r.startMonth || r.endMonth) {
+        const sTxt = r.startMonth ? r.startMonth.replace("-", "年") + "月" : "開始指定なし";
+        const eTxt = r.endMonth ? r.endMonth.replace("-", "年") + "月" : "終了なし";
+        periodLabel = `${sTxt} 〜 ${eTxt}`;
+      }
+
       return `
-        <div class="bg-white border ${isHit ? 'border-amber-400 ring-2 ring-amber-100 bg-amber-50/20' : 'border-slate-200'} rounded-xl p-4 flex flex-col justify-between shadow-sm">
+        <div class="${isOutOfPeriod ? 'bg-slate-50/70 opacity-65 border-slate-200' : (isHit ? 'bg-amber-50/20 border-amber-400 ring-2 ring-amber-100' : 'bg-white border-slate-200')} border rounded-xl p-4 flex flex-col justify-between shadow-sm transition">
           <div>
             <div class="flex justify-between items-center mb-1">
-              <div class="flex items-center gap-1">
-                <span class="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">
+              <div class="flex flex-wrap items-center gap-1">
+                <span class="text-[10px] px-2 py-0.5 rounded font-bold ${isOutOfPeriod ? 'bg-slate-200 text-slate-600 border border-slate-300' : 'bg-amber-50 text-amber-800 border border-amber-200'}">
                   ${r.frequency === 'YEARLY' ? `毎年 ${r.targetMonth}月${r.targetDay === 99 ? '末日' : r.targetDay + '日'}` : `毎月 ${r.targetDay === 99 ? '末日' : r.targetDay + '日'}`}
                 </span>
                 ${r.isShared ? '<span class="text-[10px] px-1 py-0.5 rounded font-bold bg-amber-100 text-amber-900 border border-amber-300">共有</span>' : ''}
+                ${isEnded ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-200 text-slate-700 border border-slate-300">終了済</span>' : ''}
+                ${isNotStarted ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-sky-100 text-sky-700 border border-sky-200">開始前</span>' : ''}
               </div>
               <div class="flex items-center gap-1">
                 <button onclick="openEditRecurringModal('${r.id}')" title="編集" class="text-slate-400 hover:text-indigo-600 font-medium px-1.5 py-0.5 rounded hover:bg-slate-100 transition">✏️ 編集</button>
                 <button onclick="deleteRecurring('${r.id}')" title="削除" class="text-slate-400 hover:text-rose-600 font-bold px-1.5 py-0.5 rounded hover:bg-slate-100 transition">✕</button>
               </div>
             </div>
-            <h4 class="font-bold text-slate-900 text-sm mt-1.5">${r.name}</h4>
+            <h4 class="font-bold ${isOutOfPeriod ? 'text-slate-600' : 'text-slate-900'} text-sm mt-1.5">${r.name}</h4>
             <div class="mt-2 text-[11px] text-slate-600 space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
               <div>支払元: <span class="font-semibold text-slate-800">${src ? src.name : '不明'}</span></div>
-              <div>引落予定: <span class="font-bold text-amber-800">${payDateLabel}</span></div>
+              <div>引落予定: <span class="font-bold ${isOutOfPeriod ? 'text-slate-500' : 'text-amber-800'}">${payDateLabel}</span></div>
+              ${periodLabel ? `<div>期間: <span class="font-medium text-slate-700">${periodLabel}</span></div>` : ''}
             </div>
           </div>
           <div class="mt-3 pt-2 border-t border-slate-100 text-right">
-            <span class="text-base font-black text-amber-700">¥${Number(r.amount).toLocaleString()}</span>
+            <span class="text-base font-black ${isOutOfPeriod ? 'text-slate-500' : 'text-amber-700'}">¥${Number(r.amount).toLocaleString()}</span>
           </div>
         </div>
       `;

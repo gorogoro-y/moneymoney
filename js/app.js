@@ -645,6 +645,13 @@ function updateRecurringRulePreview() {
   }
 }
 
+function clearRecurringPeriodInputs() {
+  const startEl = document.getElementById("recStartMonthInput");
+  const endEl = document.getElementById("recEndMonthInput");
+  if (startEl) startEl.value = "";
+  if (endEl) endEl.value = "";
+}
+
 function openCreateRecurringModal() {
   document.getElementById("recurringModalTitle").innerText = "固定費の登録";
   document.getElementById("recurringSubmitBtn").innerText = "登録";
@@ -654,6 +661,7 @@ function openCreateRecurringModal() {
   document.getElementById("recMonthSelect").value = "9";
   document.getElementById("recDaySelect").value = "20";
   document.getElementById("recAmountInput").value = "";
+  clearRecurringPeriodInputs();
   if (state.sources.length > 0) {
     document.getElementById("recSourceSelect").value = state.sources[0].id;
   }
@@ -675,6 +683,10 @@ function openEditRecurringModal(id) {
   document.getElementById("recDaySelect").value = String(item.targetDay || 20);
   document.getElementById("recAmountInput").value = item.amount;
   document.getElementById("recSourceSelect").value = item.sourceId;
+  const startEl = document.getElementById("recStartMonthInput");
+  const endEl = document.getElementById("recEndMonthInput");
+  if (startEl) startEl.value = item.startMonth || "";
+  if (endEl) endEl.value = item.endMonth || "";
   toggleTargetMonth();
   updateRecurringRulePreview();
   openModal("recurringModal");
@@ -689,9 +701,16 @@ async function handleSaveRecurring(e) {
   const targetDay = Number(document.getElementById("recDaySelect").value);
   const amount = Number(document.getElementById("recAmountInput").value);
   const sourceId = document.getElementById("recSourceSelect").value;
+  const startMonth = document.getElementById("recStartMonthInput")?.value || "";
+  const endMonth = document.getElementById("recEndMonthInput")?.value || "";
 
   if (!name || isNaN(amount) || amount <= 0) {
     customConfirm("正しい名称と金額を入力してください。", null, true);
+    return;
+  }
+
+  if (startMonth && endMonth && startMonth > endMonth) {
+    customConfirm("開始月は終了月以前の年月を指定してください。", null, true);
     return;
   }
 
@@ -700,7 +719,15 @@ async function handleSaveRecurring(e) {
 
   const recData = {
     id: editId || ("r-" + Date.now()),
-    name, frequency, targetMonth, targetDay, amount, sourceId, isShared
+    name,
+    frequency,
+    targetMonth,
+    targetDay,
+    amount,
+    sourceId,
+    isShared,
+    startMonth: startMonth || null,
+    endMonth: endMonth || null
   };
 
   if (editId) {

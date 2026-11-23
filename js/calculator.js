@@ -72,6 +72,21 @@ function getRecurringDueDateInfo(recurringItem, source, targetYear) {
 }
 
 /**
+ * 固定費項目が指定された利用月 (useYear, useMonth) において有効期間内か判定
+ */
+function isRecurringActiveInUseMonth(recurringItem, useYear, useMonth) {
+  if (!recurringItem) return false;
+  const useMonthKey = `${useYear}-${String(useMonth).padStart(2, '0')}`;
+  if (recurringItem.startMonth && useMonthKey < recurringItem.startMonth) {
+    return false;
+  }
+  if (recurringItem.endMonth && useMonthKey > recurringItem.endMonth) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * 起動時に開くべき月（当月未払いが残っていれば当月、完了していれば翌月）を自動判定
  */
 function getInitialMonth(expenses, recurringList, sources) {
@@ -93,12 +108,29 @@ function getInitialMonth(expenses, recurringList, sources) {
   recurringList.forEach(r => {
     const src = sources.find(s => s.id === r.sourceId);
     if (!src) return;
-    [-1, 0, 1].forEach(offsetYear => {
-      const dueInfo = getRecurringDueDateInfo(r, src, curY + offsetYear);
-      if (dueInfo && dueInfo.payMonth === curMonthStr) {
-        curRecurring.push(dueInfo);
-      }
-    });
+    if (r.frequency === 'MONTHLY') {
+      [-1, 0, 1].forEach(offsetMonth => {
+        const d = new Date(curY, curM - 1 + offsetMonth, 1);
+        const checkYear = d.getFullYear();
+        const checkMonth = d.getMonth() + 1;
+        if (!isRecurringActiveInUseMonth(r, checkYear, checkMonth)) return;
+        const dummyItem = { ...r, targetMonth: checkMonth };
+        const dueInfo = getRecurringDueDateInfo(dummyItem, src, checkYear);
+        if (dueInfo && dueInfo.payMonth === curMonthStr) {
+          curRecurring.push(dueInfo);
+        }
+      });
+    } else {
+      [-1, 0, 1].forEach(offsetYear => {
+        const checkYear = curY + offsetYear;
+        const checkMonth = r.targetMonth || 1;
+        if (!isRecurringActiveInUseMonth(r, checkYear, checkMonth)) return;
+        const dueInfo = getRecurringDueDateInfo(r, src, checkYear);
+        if (dueInfo && dueInfo.payMonth === curMonthStr) {
+          curRecurring.push(dueInfo);
+        }
+      });
+    }
   });
 
   const hasRemainingDue = 
@@ -372,12 +404,29 @@ function calculateYearlySummary(targetYear, mode, expenses, recurringList, sourc
         if (isExcluded(r.sourceId)) return; // 収支除外カードは除外
         const src = sources.find(s => s.id === r.sourceId);
         if (!src) return;
-        [-1, 0, 1].forEach(offsetYear => {
-          const dueInfo = getRecurringDueDateInfo(r, src, targetYear + offsetYear);
-          if (dueInfo && dueInfo.payMonth === monthKey) {
-            curRecurring.push({ ...r, ...dueInfo });
-          }
-        });
+        if (r.frequency === 'MONTHLY') {
+          [-1, 0, 1].forEach(offsetMonth => {
+            const d = new Date(targetYear, m - 1 + offsetMonth, 1);
+            const checkYear = d.getFullYear();
+            const checkMonth = d.getMonth() + 1;
+            if (!isRecurringActiveInUseMonth(r, checkYear, checkMonth)) return;
+            const dummyItem = { ...r, targetMonth: checkMonth };
+            const dueInfo = getRecurringDueDateInfo(dummyItem, src, checkYear);
+            if (dueInfo && dueInfo.payMonth === monthKey) {
+              curRecurring.push({ ...r, ...dueInfo });
+            }
+          });
+        } else {
+          [-1, 0, 1].forEach(offsetYear => {
+            const checkYear = targetYear + offsetYear;
+            const checkMonth = r.targetMonth || 1;
+            if (!isRecurringActiveInUseMonth(r, checkYear, checkMonth)) return;
+            const dueInfo = getRecurringDueDateInfo(r, src, checkYear);
+            if (dueInfo && dueInfo.payMonth === monthKey) {
+              curRecurring.push({ ...r, ...dueInfo });
+            }
+          });
+        }
       });
     } else {
       // 利用月基準（使った月）
@@ -395,6 +444,7 @@ function calculateYearlySummary(targetYear, mode, expenses, recurringList, sourc
       recurringList.forEach(r => {
         if (isExcluded(r.sourceId)) return; // 収支除外カードは除外
         if (r.frequency === 'MONTHLY' || Number(r.targetMonth) === m) {
+          if (!isRecurringActiveInUseMonth(r, targetYear, m)) return;
           curRecurring.push({ ...r, useMonth: m });
         }
       });
