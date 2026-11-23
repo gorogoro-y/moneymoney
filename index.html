@@ -549,6 +549,22 @@
           </p>
         </div>
 
+        <!-- 自分の収支への反映/除外設定 -->
+        <div id="srcBudgetInclusionContainer" class="p-3 bg-indigo-50/60 rounded-xl border border-indigo-200 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-indigo-950 text-[11px] flex items-center gap-1">
+              <span>📊</span> 自分の収支に反映する
+            </span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="srcIncludeInBudgetCheckbox" checked class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+          </div>
+          <p class="text-[10px] text-indigo-900 leading-snug">
+            家族カードなど「明細は共有するが支払いは相手がする」場合はOFFにしてください。OFFにすると、自分の支出合計や引き落とし予定から除外されます（相手側の収支には影響しません）。
+          </p>
+        </div>
+
         <div id="creditRuleInputs" class="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
           <div class="grid grid-cols-2 gap-2">
             <div>

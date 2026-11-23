@@ -72,6 +72,7 @@ function setupCloudListeners() {
           state.personalDebts = d.personalDebts || [];
           state.personalIncomeSources = d.personalIncomeSources || [];
           state.personalIncomeEntries = d.personalIncomeEntries || [];
+          state.excludedSharedSourceIds = d.excludedSharedSourceIds || [];
 
           if (!state.sharedPassphrase.trim()) {
             if (d.sharedSources) state.sharedSources = d.sharedSources;
@@ -139,6 +140,7 @@ async function syncToCloud() {
       personalDebts: state.personalDebts,
       personalIncomeSources: state.personalIncomeSources,
       personalIncomeEntries: state.personalIncomeEntries,
+      excludedSharedSourceIds: state.excludedSharedSourceIds || [],
       sharedSources: state.sharedSources,
       sharedExpenses: state.sharedExpenses,
       sharedRecurring: state.sharedRecurring,
@@ -196,6 +198,7 @@ async function fetchVaultDataFromCloud() {
       state.personalDebts = d.personalDebts || [];
       state.personalIncomeSources = d.personalIncomeSources || [];
       state.personalIncomeEntries = d.personalIncomeEntries || [];
+      state.excludedSharedSourceIds = d.excludedSharedSourceIds || [];
 
       if (d.sharedSources) state.sharedSources = d.sharedSources;
       if (d.sharedExpenses) state.sharedExpenses = d.sharedExpenses;

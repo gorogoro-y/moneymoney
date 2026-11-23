@@ -389,6 +389,16 @@ function render() {
   });
 
   const sortedSources = getSortedSources();
+  const excludedIds = state.excludedSharedSourceIds || [];
+  const isExcluded = (id) => excludedIds.includes(id);
+
+  // 各明細に収支除外フラグを付与
+  currentExpenses.forEach(e => {
+    e.isExcludedFromBudget = isExcluded(e.sourceId);
+  });
+  currentRecurring.forEach(r => {
+    r.isExcludedFromBudget = isExcluded(r.sourceId);
+  });
 
   // カード・口座別の支出と、現金支出を分離
   const cashExpenses = currentExpenses.filter(e => e.sourceId === CASH_SOURCE_ID || e.sourceId === 'CASH');
@@ -396,15 +406,19 @@ function render() {
 
   // 当月のローン返済明細の計算 & 分離
   const currentDebts = calculateMonthlyDebtEntries(state.debts || [], state.currentMonth, sortedSources);
+  currentDebts.forEach(d => {
+    d.isExcludedFromBudget = isExcluded(d.sourceId);
+  });
   const cardDebts = currentDebts.filter(d => d.sourceId !== 'CASH' && d.sourceId !== CASH_SOURCE_ID);
   const cashDebts = currentDebts.filter(d => d.sourceId === 'CASH' || d.sourceId === CASH_SOURCE_ID);
 
-  const cardDebtsTotal = cardDebts.reduce((sum, d) => sum + Number(d.amount), 0);
-  const cashDebtsTotal = cashDebts.reduce((sum, d) => sum + Number(d.amount), 0);
+  // 収支に反映する項目のみで合計額を計算（除外カードは除外）
+  const cardDebtsTotal = cardDebts.filter(d => !d.isExcludedFromBudget).reduce((sum, d) => sum + Number(d.amount), 0);
+  const cashDebtsTotal = cashDebts.filter(d => !d.isExcludedFromBudget).reduce((sum, d) => sum + Number(d.amount), 0);
 
-  const regularTotal = cardExpenses.reduce((sum, e) => sum + Number(e.amount), 0) + cardDebtsTotal;
-  const recurringTotal = currentRecurring.reduce((sum, r) => sum + Number(r.amount), 0);
-  const cashTotal = cashExpenses.reduce((sum, e) => sum + Number(e.amount), 0) + cashDebtsTotal;
+  const regularTotal = cardExpenses.filter(e => !e.isExcludedFromBudget).reduce((sum, e) => sum + Number(e.amount), 0) + cardDebtsTotal;
+  const recurringTotal = currentRecurring.filter(r => !r.isExcludedFromBudget).reduce((sum, r) => sum + Number(r.amount), 0);
+  const cashTotal = cashExpenses.filter(e => !e.isExcludedFromBudget).reduce((sum, e) => sum + Number(e.amount), 0) + cashDebtsTotal;
   const grandTotal = regularTotal + recurringTotal + cashTotal;
 
   // 当月の収入明細の抽出 & 総収入の計算
@@ -498,17 +512,21 @@ function renderDashboardTab({ year, month, monthlyIncome, grandTotal, netSavings
   const container = document.getElementById("tabContent-dashboard");
   if (!container) return;
 
-  const nextAction = getNextDueAction(currentExpenses, currentRecurring, sortedSources, currentDebts);
+  const excludedIds = state.excludedSharedSourceIds || [];
+  const isExcluded = (id) => excludedIds.includes(id);
+
+  const nextAction = getNextDueAction(currentExpenses, currentRecurring, sortedSources, currentDebts, excludedIds);
   const isSurplus = netSavings >= 0;
 
   const totalDebtBalance = (state.debts || []).reduce((sum, d) => sum + Number(d.totalBalance), 0);
   const totalMonthlyDebtPay = (state.debts || []).reduce((sum, d) => sum + Number(d.monthlyPayment), 0);
 
   // 今年の年間サマリーを計算（ホームバナー用）
-  const curYearSummary = calculateYearlySummary(year, 'DUE_MONTH', state.expenses, state.recurringList, state.sources, state.incomeEntries, state.debts || []);
+  const curYearSummary = calculateYearlySummary(year, 'DUE_MONTH', state.expenses, state.recurringList, state.sources, state.incomeEntries, state.debts || [], excludedIds);
 
   // 各カード・口座の引き落とし予定
   const dueItems = sortedSources.map(src => {
+    const isSrcExcluded = isExcluded(src.id);
     const cardExpenses = currentExpenses.filter(e => e.sourceId === src.id);
     const cardRecs = currentRecurring.filter(r => r.sourceId === src.id);
     const cardDebts = currentDebts.filter(d => d.sourceId === src.id);
@@ -531,7 +549,7 @@ function renderDashboardTab({ year, month, monthlyIncome, grandTotal, netSavings
       dateDisplay = dates.length > 0 ? `${month}月 ${dates.map(d => d + '日').join(', ')}` : '指定日引落';
       sortDay = dates.length > 0 ? dates[0] : 99;
     }
-    return { src, total, dateDisplay, sortDay };
+    return { src, total, dateDisplay, sortDay, isExcluded: isSrcExcluded };
   }).sort((a, b) => a.sortDay - b.sortDay);
 
   container.innerHTML = `
@@ -656,15 +674,16 @@ function renderDashboardTab({ year, month, monthlyIncome, grandTotal, netSavings
 
         <div class="divide-y divide-slate-100 max-h-56 overflow-y-auto no-scrollbar">
           ${dueItems.length > 0 ? dueItems.map(item => `
-            <div class="py-2 flex items-center justify-between text-xs hover:bg-slate-50 px-1 rounded transition">
+            <div class="py-2 flex items-center justify-between text-xs hover:bg-slate-50 px-1 rounded transition ${item.isExcluded ? 'opacity-60 bg-slate-50/50' : ''}">
               <div class="flex items-center gap-2 min-w-0">
                 <span class="text-[11px] font-bold text-slate-600 shrink-0">${item.dateDisplay}</span>
                 <span class="text-[10px] px-1.5 py-0.2 rounded font-semibold shrink-0 ${item.src.type === 'CREDIT' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-teal-50 text-teal-700 border border-teal-200'}">
                   ${item.src.type === 'CREDIT' ? 'クレカ' : '口座振替'}
                 </span>
+                ${item.isExcluded ? '<span class="text-[9px] px-1.5 py-0.2 rounded font-bold bg-slate-200 text-slate-700 shrink-0">収支除外</span>' : ''}
                 <span class="font-medium text-slate-800 truncate">${item.src.name}</span>
               </div>
-              <div class="font-bold text-slate-900 shrink-0 ml-2">
+              <div class="font-bold shrink-0 ml-2 ${item.isExcluded ? 'text-slate-400 text-[11px]' : 'text-slate-900'}">
                 ¥${item.total.toLocaleString()}
               </div>
             </div>
@@ -807,7 +826,8 @@ function renderYearlyTab() {
     state.recurringList,
     state.sources,
     state.incomeEntries,
-    state.debts || []
+    state.debts || [],
+    state.excludedSharedSourceIds || []
   );
 
   const isDUE = mode === 'DUE_MONTH';
@@ -1153,6 +1173,7 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
     sourcesHtml = `<div class="bg-white border border-slate-200 rounded-xl p-8 text-center text-xs text-slate-400">カードや口座が登録されていません。「設定」タブから設定してください。</div>`;
   } else {
     sourcesHtml = sortedSources.map(src => {
+      const isSrcExcluded = (state.excludedSharedSourceIds || []).includes(src.id);
       const cardExpenses = currentExpenses.filter(e => e.sourceId === src.id);
       const cardRecs = currentRecurring.filter(r => r.sourceId === src.id);
       const cardDebts = (currentDebts || []).filter(d => d.sourceId === src.id);
@@ -1172,9 +1193,10 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
       // ローン返済の表示（最上段）
       if (cardDebts.length > 0) {
         itemsHtml += cardDebts.map(d => `
-          <tr onclick="openEditDebtOverrideModal('${d.debtId}', '${d.payMonth}')" class="bg-indigo-50/40 hover:bg-indigo-100/60 cursor-pointer transition group" title="クリックしてこの月の返済額を変更">
+          <tr onclick="openEditDebtOverrideModal('${d.debtId}', '${d.payMonth}')" class="${isSrcExcluded ? 'opacity-65' : ''} bg-indigo-50/40 hover:bg-indigo-100/60 cursor-pointer transition group" title="クリックしてこの月の返済額を変更">
             <td class="p-3 text-indigo-700 whitespace-nowrap font-medium">
               <span class="inline-block px-1.5 py-0.5 rounded bg-indigo-100 text-[10px] text-indigo-800 border border-indigo-300 font-bold mr-1">🏦 ローン返済</span>
+              ${isSrcExcluded ? '<span class="inline-block px-1.5 py-0.5 rounded bg-slate-200 text-[9px] text-slate-700 font-bold mr-1">除外</span>' : ''}
               <span class="text-slate-500 text-[11px]">${d.payDate}</span>
             </td>
             <td class="p-3 text-indigo-950 font-bold break-words leading-relaxed whitespace-normal">
@@ -1182,16 +1204,17 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
               ${d.isOverridden ? '<span class="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold ml-1.5 border border-amber-300">●今月返済額変更済</span>' : ''}
               <span class="opacity-0 group-hover:opacity-100 text-[10px] text-indigo-600 font-semibold ml-1.5 transition-opacity">✏️金額変更</span>
             </td>
-            <td class="p-3 text-right font-black text-indigo-950 whitespace-nowrap">¥${Number(d.amount).toLocaleString()}</td>
+            <td class="p-3 text-right ${isSrcExcluded ? 'text-slate-400 font-bold' : 'font-black text-indigo-950'} whitespace-nowrap">¥${Number(d.amount).toLocaleString()}</td>
             <td class="p-3 text-center text-xs text-slate-400">固定</td>
           </tr>
         `).join("");
 
         mobileItemsHtml += cardDebts.map(d => `
-          <div onclick="openEditDebtOverrideModal('${d.debtId}', '${d.payMonth}')" class="p-3.5 bg-indigo-50/40 hover:bg-indigo-100/60 active:bg-indigo-100 cursor-pointer transition flex items-start justify-between gap-3 group" title="タップしてこの月の返済額を変更">
+          <div onclick="openEditDebtOverrideModal('${d.debtId}', '${d.payMonth}')" class="${isSrcExcluded ? 'opacity-65' : ''} p-3.5 bg-indigo-50/40 hover:bg-indigo-100/60 active:bg-indigo-100 cursor-pointer transition flex items-start justify-between gap-3 group" title="タップしてこの月の返済額を変更">
             <div class="min-w-0 flex-1 space-y-1">
               <div class="flex items-center gap-1.5 text-[10px]">
                 <span class="px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold">🏦 ローン返済</span>
+                ${isSrcExcluded ? '<span class="px-1 py-0.2 rounded bg-slate-200 text-slate-700 font-bold text-[9px]">除外</span>' : ''}
                 <span class="text-slate-500">${d.payDate}</span>
                 <span class="text-indigo-600">✏️変更</span>
               </div>
@@ -1201,7 +1224,7 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
               </div>
             </div>
             <div class="text-right shrink-0">
-              <span class="text-sm font-black text-indigo-950">¥${Number(d.amount).toLocaleString()}</span>
+              <span class="text-sm ${isSrcExcluded ? 'text-slate-400 font-bold' : 'font-black text-indigo-950'}">¥${Number(d.amount).toLocaleString()}</span>
             </div>
           </div>
         `).join("");
@@ -1209,13 +1232,16 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
 
       if (cardExpenses.length > 0) {
         itemsHtml += cardExpenses.map(e => `
-          <tr onclick="openEditExpenseModal('${e.id}')" class="hover:bg-rose-50/40 cursor-pointer transition group" title="クリックして編集">
-            <td class="p-3 text-slate-500 whitespace-nowrap">${e.date}</td>
+          <tr onclick="openEditExpenseModal('${e.id}')" class="${isSrcExcluded ? 'opacity-65' : ''} hover:bg-rose-50/40 cursor-pointer transition group" title="クリックして編集">
+            <td class="p-3 text-slate-500 whitespace-nowrap">
+              ${e.date}
+              ${isSrcExcluded ? '<span class="inline-block px-1.5 py-0.5 rounded bg-slate-200 text-[9px] text-slate-700 font-bold ml-1">除外</span>' : ''}
+            </td>
             <td class="p-3 text-slate-800 font-medium break-words leading-relaxed whitespace-normal">
               ${e.memo || '未分類'}
               <span class="opacity-0 group-hover:opacity-100 text-[10px] text-rose-500 font-semibold ml-1.5 transition-opacity">✏️編集</span>
             </td>
-            <td class="p-3 text-right font-bold text-slate-900 whitespace-nowrap">¥${Number(e.amount).toLocaleString()}</td>
+            <td class="p-3 text-right ${isSrcExcluded ? 'text-slate-400 font-normal' : 'font-bold text-slate-900'} whitespace-nowrap">¥${Number(e.amount).toLocaleString()}</td>
             <td class="p-3 text-center whitespace-nowrap" onclick="event.stopPropagation()">
               <button onclick="deleteExpense('${e.id}')" title="削除" class="text-slate-400 hover:text-rose-600 font-bold px-2 py-1 rounded hover:bg-slate-100 transition">✕</button>
             </td>
@@ -1223,11 +1249,12 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
         `).join("");
 
         mobileItemsHtml += cardExpenses.map(e => `
-          <div onclick="openEditExpenseModal('${e.id}')" class="p-3.5 hover:bg-rose-50/40 active:bg-rose-100/40 cursor-pointer transition flex items-start justify-between gap-3 group" title="タップして編集">
+          <div onclick="openEditExpenseModal('${e.id}')" class="${isSrcExcluded ? 'opacity-65' : ''} p-3.5 hover:bg-rose-50/40 active:bg-rose-100/40 cursor-pointer transition flex items-start justify-between gap-3 group" title="タップして編集">
             <div class="min-w-0 flex-1 space-y-1">
               <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
                 <span>📅</span>
                 <span>${e.date}</span>
+                ${isSrcExcluded ? '<span class="px-1.5 py-0.2 rounded bg-slate-200 text-slate-700 font-bold text-[9px]">収支除外</span>' : ''}
                 <span class="text-[10px] text-rose-500">✏️タップで編集</span>
               </div>
               <div class="text-xs font-semibold text-slate-900 break-words leading-snug whitespace-normal">
@@ -1235,7 +1262,7 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
               </div>
             </div>
             <div class="text-right shrink-0 flex items-center gap-2">
-              <span class="text-sm font-black text-slate-900">¥${Number(e.amount).toLocaleString()}</span>
+              <span class="text-sm ${isSrcExcluded ? 'text-slate-400 font-medium' : 'font-black text-slate-900'}">¥${Number(e.amount).toLocaleString()}</span>
               <button onclick="event.stopPropagation(); deleteExpense('${e.id}')" title="削除" class="text-slate-400 hover:text-rose-600 font-bold p-1.5 rounded active:bg-slate-200 transition">✕</button>
             </div>
           </div>
@@ -1244,32 +1271,34 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
 
       if (cardRecs.length > 0) {
         itemsHtml += cardRecs.map(r => `
-          <tr onclick="openEditRecurringModal('${r.id}')" class="bg-amber-50/40 hover:bg-amber-100/60 cursor-pointer transition group" title="クリックして固定費を編集">
+          <tr onclick="openEditRecurringModal('${r.id}')" class="${isSrcExcluded ? 'opacity-65' : ''} bg-amber-50/40 hover:bg-amber-100/60 cursor-pointer transition group" title="クリックして固定費を編集">
             <td class="p-3 text-amber-800 whitespace-nowrap font-medium">
               <span class="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-[10px] text-amber-800 border border-amber-300 font-bold mr-1">固定/年払</span>
+              ${isSrcExcluded ? '<span class="inline-block px-1.5 py-0.5 rounded bg-slate-200 text-[9px] text-slate-700 font-bold mr-1">除外</span>' : ''}
               <span class="text-slate-500 text-[11px]">${r.payDate}</span>
             </td>
             <td class="p-3 text-amber-900 font-bold break-words leading-relaxed whitespace-normal">
               ${r.name}
               <span class="opacity-0 group-hover:opacity-100 text-[10px] text-amber-600 font-semibold ml-1.5 transition-opacity">✏️編集</span>
             </td>
-            <td class="p-3 text-right font-bold text-amber-800 whitespace-nowrap">¥${Number(r.amount).toLocaleString()}</td>
+            <td class="p-3 text-right ${isSrcExcluded ? 'text-slate-400 font-normal' : 'font-bold text-amber-800'} whitespace-nowrap">¥${Number(r.amount).toLocaleString()}</td>
             <td class="p-3 text-center text-xs text-slate-400">-</td>
           </tr>
         `).join("");
 
         mobileItemsHtml += cardRecs.map(r => `
-          <div onclick="openEditRecurringModal('${r.id}')" class="p-3.5 bg-amber-50/40 hover:bg-amber-100/60 active:bg-amber-100 cursor-pointer transition flex items-start justify-between gap-3 group" title="タップして固定費を編集">
+          <div onclick="openEditRecurringModal('${r.id}')" class="${isSrcExcluded ? 'opacity-65' : ''} p-3.5 bg-amber-50/40 hover:bg-amber-100/60 active:bg-amber-100 cursor-pointer transition flex items-start justify-between gap-3 group" title="タップして固定費を編集">
             <div class="min-w-0 flex-1 space-y-1">
               <div class="flex items-center gap-1.5 text-[10px]">
                 <span class="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 font-bold">固定/年払</span>
+                ${isSrcExcluded ? '<span class="px-1 py-0.2 rounded bg-slate-200 text-slate-700 font-bold text-[9px]">除外</span>' : ''}
                 <span class="text-slate-500">${r.payDate}</span>
                 <span class="text-amber-700">✏️編集</span>
               </div>
               <div class="text-xs font-bold text-amber-900 break-words leading-snug whitespace-normal">${r.name}</div>
             </div>
             <div class="text-right shrink-0">
-              <span class="text-sm font-black text-amber-800">¥${Number(r.amount).toLocaleString()}</span>
+              <span class="text-sm ${isSrcExcluded ? 'text-slate-400 font-medium' : 'font-black text-amber-800'}">¥${Number(r.amount).toLocaleString()}</span>
             </div>
           </div>
         `).join("");
@@ -1281,13 +1310,14 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
         : `引落日: <span class="font-semibold text-teal-800">各明細の指定日に引き落とし（口座振替）</span>`;
 
       return `
-        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-          <div class="p-4 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div class="bg-white border ${isSrcExcluded ? 'border-slate-300 shadow-none' : 'border-slate-200 shadow-sm'} rounded-xl overflow-hidden">
+          <div class="p-4 bg-gradient-to-r ${isSrcExcluded ? 'from-slate-100 to-slate-50' : 'from-slate-50 to-white'} border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2.5">
               <span class="text-[10px] px-2 py-0.5 rounded font-bold ${src.type === 'CREDIT' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-teal-50 text-teal-700 border border-teal-200'}">
                 ${src.type === 'CREDIT' ? 'クレジットカード' : '銀行口座振替'}
               </span>
               ${src.isShared ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-0.5"><span>🤝</span>共有カード</span>' : ''}
+              ${isSrcExcluded ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-200 text-slate-700 border border-slate-300 flex items-center gap-0.5"><span>🚫</span>自分の収支から除外中</span>' : ''}
               <div>
                 <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">${src.name}</h3>
                 <p class="text-[11px] text-slate-500 mt-0.5">${scheduleDescription}</p>
@@ -1296,8 +1326,9 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
 
             <div class="flex items-center gap-3">
               <div class="text-right">
-                <span class="text-[10px] text-slate-400 block">当月引落予定額</span>
-                <span class="text-lg font-black text-orange-700">¥${total.toLocaleString()}</span>
+                <span class="text-[10px] text-slate-400 block">${isSrcExcluded ? '当月利用額（支払なし）' : '当月引落予定額'}</span>
+                <span class="text-lg font-black ${isSrcExcluded ? 'text-slate-400' : 'text-orange-700'}">¥${total.toLocaleString()}</span>
+                ${isSrcExcluded ? '<span class="text-[9px] text-slate-500 block font-bold">※自分の収支から除外</span>' : ''}
               </div>
               <button onclick="openExpenseModalWithSource('${src.id}')" title="このカード・口座に支出明細を追加" class="px-3 py-2 text-xs font-bold rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition active:scale-95">
                 − 支出追加
@@ -1352,8 +1383,10 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
       dateDisplay = dates.length > 0 ? `${month}月 ${dates.map(d => d + '日').join(', ')}` : '指定日引落';
     }
 
+    const isSrcExcluded = (state.excludedSharedSourceIds || []).includes(src.id);
+
     return `
-      <div class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2 shadow-sm">
+      <div class="bg-slate-50 border ${isSrcExcluded ? 'border-slate-300 opacity-60' : 'border-slate-200'} rounded-xl px-3 py-2 flex items-center justify-between gap-2 shadow-sm">
         <div class="min-w-0">
           <div class="flex items-center gap-1.5">
             <span class="text-[11px] font-bold text-slate-800">${dateDisplay}</span>
@@ -1361,12 +1394,13 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
               ${src.type === 'CREDIT' ? 'クレカ' : '口座振替'}
             </span>
             ${src.isShared ? '<span class="text-[10px] px-1 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 font-bold">共有</span>' : ''}
+            ${isSrcExcluded ? '<span class="text-[9px] px-1 py-0.2 rounded bg-slate-200 text-slate-700 font-bold">収支除外</span>' : ''}
           </div>
           <div class="text-xs font-semibold text-slate-700 truncate mt-0.5">${src.name}</div>
         </div>
         <div class="text-right shrink-0">
-          <span class="text-[10px] text-slate-400 block">引落予定額</span>
-          <span class="text-xs sm:text-sm font-bold text-slate-900">¥${total.toLocaleString()}</span>
+          <span class="text-[10px] text-slate-400 block">${isSrcExcluded ? '利用合計(支払なし)' : '引落予定額'}</span>
+          <span class="text-xs sm:text-sm font-bold ${isSrcExcluded ? 'text-slate-400' : 'text-slate-900'}">¥${total.toLocaleString()}</span>
         </div>
       </div>
     `;
@@ -1698,20 +1732,22 @@ function renderSourcesTab({ sortedSources }) {
   const sourcesContainer = document.getElementById("sourcesListContainer");
   if (sourcesContainer) {
     sourcesContainer.innerHTML = sortedSources.map((src, idx) => {
+      const isExcluded = (state.excludedSharedSourceIds || []).includes(src.id);
       const offsetName = (src.paymentMonthOffset === 2) ? '翌々月' : ((src.paymentMonthOffset === 0) ? '当月' : '翌月');
       const payDayText = src.paymentDay === 99 ? '末日' : `${src.paymentDay} 日`;
       const isFirst = idx === 0;
       const isLast = idx === sortedSources.length - 1;
 
       return `
-        <div class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between shadow-sm hover:border-slate-300 transition">
+        <div class="bg-white border ${isExcluded ? 'border-slate-300' : 'border-slate-200'} rounded-xl p-4 flex flex-col justify-between shadow-sm hover:border-slate-300 transition">
           <div>
             <div class="flex justify-between items-center mb-1">
-              <div class="flex items-center gap-1">
+              <div class="flex flex-wrap items-center gap-1">
                 <span class="text-[10px] px-2 py-0.5 rounded font-bold ${src.type === 'CREDIT' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-teal-50 text-teal-700 border border-teal-200'}">
                   ${src.type === 'CREDIT' ? 'クレジットカード' : '銀行口座振替'}
                 </span>
                 ${src.isShared ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-0.5"><span>🤝</span>共有</span>' : '<span class="text-[10px] px-1.5 py-0.5 rounded font-medium bg-slate-100 text-slate-500">個人専用</span>'}
+                ${src.isShared && isExcluded ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-200 text-slate-700 border border-slate-300 flex items-center gap-0.5"><span>🚫</span>収支除外中</span>' : ''}
               </div>
               <div class="flex items-center gap-1">
                 <button onclick="handleMoveSourceOrder('${src.id}', -1)" ${isFirst ? 'disabled' : ''} title="上へ移動" class="p-1 rounded text-xs font-bold ${isFirst ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-100 active:scale-95 transition'}">▲</button>
@@ -1738,6 +1774,18 @@ function renderSourcesTab({ sortedSources }) {
                 </div>
               `}
             </div>
+
+            ${src.isShared ? `
+              <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span class="text-slate-600 font-medium text-[11px] flex items-center gap-1">
+                  <span>📊</span> 自分側の収支:
+                </span>
+                <button onclick="toggleExcludeSharedSource('${src.id}')" title="クリックして自分の収支に含める/除外するを切り替え" class="px-2.5 py-1 rounded-lg font-bold text-[10px] transition active:scale-95 flex items-center gap-1 ${isExcluded ? 'bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100'}">
+                  ${isExcluded ? '<span>🚫</span> 収支から除外中' : '<span>✅</span> 収支に反映中'}
+                </button>
+              </div>
+              ${isExcluded ? '<div class="text-[9px] text-slate-400 mt-1 leading-tight text-right">※ 相手側の収支には影響しません</div>' : ''}
+            ` : ''}
           </div>
         </div>
       `;

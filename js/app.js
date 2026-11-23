@@ -444,6 +444,8 @@ function openCreateSourceModal() {
   document.getElementById("srcPaymentOffsetSelect").value = "1";
   document.getElementById("srcPaymentSelect").value = "10";
   document.getElementById("srcIsSharedCheckbox").checked = false;
+  const budgetBox = document.getElementById("srcIncludeInBudgetCheckbox");
+  if (budgetBox) budgetBox.checked = true;
   setSourceType("CREDIT");
   updateCreditRulePreview();
   openModal("sourceModal");
@@ -458,6 +460,9 @@ function openEditSourceModal(id) {
   document.getElementById("editingSourceId").value = src.id;
   document.getElementById("srcNameInput").value = src.name;
   document.getElementById("srcIsSharedCheckbox").checked = !!src.isShared;
+  const isExcluded = (state.excludedSharedSourceIds || []).includes(src.id);
+  const budgetBox = document.getElementById("srcIncludeInBudgetCheckbox");
+  if (budgetBox) budgetBox.checked = !isExcluded;
   setSourceType(src.type);
 
   if (src.type === "CREDIT") {
@@ -509,6 +514,19 @@ async function handleSaveSource(e) {
     state.personalSources.push(newSourceData);
   }
 
+  // 自分の収支への反映/除外設定を個人設定に反映
+  const budgetBox = document.getElementById("srcIncludeInBudgetCheckbox");
+  const includeInBudget = budgetBox ? budgetBox.checked : true;
+  if (!state.excludedSharedSourceIds) state.excludedSharedSourceIds = [];
+  if (!includeInBudget) {
+    if (!state.excludedSharedSourceIds.includes(newSourceData.id)) {
+      state.excludedSharedSourceIds.push(newSourceData.id);
+    }
+  } else {
+    state.excludedSharedSourceIds = state.excludedSharedSourceIds.filter(id => id !== newSourceData.id);
+  }
+  saveToLocalCache();
+
   // カードの共有ON/OFF変更に合わせて、登録済み明細の共有フラグも連動更新
   const allExpenses = [...state.personalExpenses, ...state.sharedExpenses];
   state.personalExpenses = [];
@@ -531,6 +549,26 @@ async function handleSaveSource(e) {
   showSaveToast("カード・口座を保存しました");
 }
 
+/**
+ * 共有カードを自分の収支に反映/除外をワンタップで切り替え（個人設定）
+ */
+async function toggleExcludeSharedSource(sourceId) {
+  if (!state.excludedSharedSourceIds) state.excludedSharedSourceIds = [];
+  const idx = state.excludedSharedSourceIds.indexOf(sourceId);
+  let isNowExcluded = false;
+  if (idx >= 0) {
+    state.excludedSharedSourceIds.splice(idx, 1);
+    isNowExcluded = false;
+  } else {
+    state.excludedSharedSourceIds.push(sourceId);
+    isNowExcluded = true;
+  }
+  saveToLocalCache();
+  render();
+  await syncToCloud();
+  showSaveToast(isNowExcluded ? "このカードを自分の収支から除外しました" : "このカードを自分の収支に反映しました");
+}
+
 function deleteSource(id) {
   if (state.sources.length <= 1) {
     customConfirm("最低1つのカードまたは口座が必要です。", null, true);
@@ -544,6 +582,8 @@ function deleteSource(id) {
     state.sharedExpenses = state.sharedExpenses.filter(e => e.sourceId !== id);
     state.personalRecurring = state.personalRecurring.filter(r => r.sourceId !== id);
     state.sharedRecurring = state.sharedRecurring.filter(r => r.sourceId !== id);
+    state.excludedSharedSourceIds = (state.excludedSharedSourceIds || []).filter(x => x !== id);
+    saveToLocalCache();
 
     mergeAndRefreshData();
     render();

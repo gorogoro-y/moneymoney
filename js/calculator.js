@@ -214,14 +214,16 @@ function calculateMonthlyDebtEntries(debts, targetMonth, sources) {
 /**
  * 次回直近の引き落としアクションを取得（カウントダウン用）
  */
-function getNextDueAction(currentExpenses, currentRecurring, sources, currentDebts = []) {
+function getNextDueAction(currentExpenses, currentRecurring, sources, currentDebts = [], excludedSourceIds = []) {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
   const todayStr = local.toISOString().split("T")[0];
 
+  const isExcluded = (id) => (excludedSourceIds && excludedSourceIds.includes(id));
+
   const payMap = new Map();
   currentExpenses.forEach(e => {
-    if (e.sourceId === 'CASH') return; // 現金支出は口座引き落としではないため除外
+    if (e.sourceId === 'CASH' || isExcluded(e.sourceId)) return; // 現金支出または収支除外カードは除外
     if (e.payDate && e.payDate >= todayStr) {
       const key = `${e.sourceId}_${e.payDate}`;
       const prev = payMap.get(key) || { sourceId: e.sourceId, payDate: e.payDate, amount: 0 };
@@ -231,6 +233,7 @@ function getNextDueAction(currentExpenses, currentRecurring, sources, currentDeb
   });
 
   currentRecurring.forEach(r => {
+    if (isExcluded(r.sourceId)) return; // 収支除外カードは除外
     if (r.payDate && r.payDate >= todayStr) {
       const key = `${r.sourceId}_${r.payDate}`;
       const prev = payMap.get(key) || { sourceId: r.sourceId, payDate: r.payDate, amount: 0 };
@@ -240,7 +243,7 @@ function getNextDueAction(currentExpenses, currentRecurring, sources, currentDeb
   });
 
   (currentDebts || []).forEach(d => {
-    if (d.sourceId === 'CASH') return; // 現金返済は除外
+    if (d.sourceId === 'CASH' || isExcluded(d.sourceId)) return; // 現金返済または収支除外カードは除外
     if (d.payDate && d.payDate >= todayStr) {
       const key = `${d.sourceId}_${d.payDate}`;
       const prev = payMap.get(key) || { sourceId: d.sourceId, payDate: d.payDate, amount: 0 };
@@ -331,11 +334,13 @@ function simulateDebtPayoff(totalBalance, monthlyPayment, interestRate = 0, extr
  * @param {Array} sources 
  * @param {Array} incomeEntries 
  */
-function calculateYearlySummary(targetYear, mode, expenses, recurringList, sources, incomeEntries = [], debts = []) {
+function calculateYearlySummary(targetYear, mode, expenses, recurringList, sources, incomeEntries = [], debts = [], excludedSourceIds = []) {
   const monthsData = [];
   let grandExpense = 0;
   let grandIncome = 0;
   let maxMonth = { month: 1, total: 0 };
+
+  const isExcluded = (id) => (excludedSourceIds && excludedSourceIds.includes(id));
 
   for (let m = 1; m <= 12; m++) {
     const monthKey = `${targetYear}-${String(m).padStart(2, '0')}`;
@@ -349,6 +354,7 @@ function calculateYearlySummary(targetYear, mode, expenses, recurringList, sourc
     if (mode === 'DUE_MONTH') {
       // 引き落とし月基準
       expenses.forEach(e => {
+        if (isExcluded(e.sourceId)) return; // 収支除外カードは除外
         if (e.sourceId === 'CASH' || e.sourceId === CASH_SOURCE_ID) {
           if (e.date && e.date.startsWith(monthKey)) {
             cashExpenses.push(e);
@@ -363,6 +369,7 @@ function calculateYearlySummary(targetYear, mode, expenses, recurringList, sourc
       });
 
       recurringList.forEach(r => {
+        if (isExcluded(r.sourceId)) return; // 収支除外カードは除外
         const src = sources.find(s => s.id === r.sourceId);
         if (!src) return;
         [-1, 0, 1].forEach(offsetYear => {
@@ -375,6 +382,7 @@ function calculateYearlySummary(targetYear, mode, expenses, recurringList, sourc
     } else {
       // 利用月基準（使った月）
       expenses.forEach(e => {
+        if (isExcluded(e.sourceId)) return; // 収支除外カードは除外
         if (e.date && e.date.startsWith(monthKey)) {
           if (e.sourceId === 'CASH' || e.sourceId === CASH_SOURCE_ID) {
             cashExpenses.push(e);
@@ -385,6 +393,7 @@ function calculateYearlySummary(targetYear, mode, expenses, recurringList, sourc
       });
 
       recurringList.forEach(r => {
+        if (isExcluded(r.sourceId)) return; // 収支除外カードは除外
         if (r.frequency === 'MONTHLY' || Number(r.targetMonth) === m) {
           curRecurring.push({ ...r, useMonth: m });
         }
@@ -395,6 +404,7 @@ function calculateYearlySummary(targetYear, mode, expenses, recurringList, sourc
     let debtRegTotal = 0;
     let debtCashTotal = 0;
     curDebts.forEach(d => {
+      if (isExcluded(d.sourceId)) return; // 収支除外カードは除外
       if (d.sourceId === 'CASH') {
         debtCashTotal += d.amount;
       } else {

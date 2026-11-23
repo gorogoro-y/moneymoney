@@ -33,6 +33,9 @@ const state = {
   incomeSources: [],
   incomeEntries: [],
 
+  // 自分の収支から除外する共有カードID一覧（ローカル/個人設定）
+  excludedSharedSourceIds: [],
+
   // リスナー
   listeners: []
 };
@@ -224,6 +227,7 @@ function resetToDefaultData() {
 
   state.personalDebts = JSON.parse(JSON.stringify((defaultData.debts || []).filter(d => !d.isShared)));
   state.sharedDebts = JSON.parse(JSON.stringify((defaultData.debts || []).filter(d => d.isShared)));
+  state.excludedSharedSourceIds = [];
 
   mergeAndRefreshData();
 }

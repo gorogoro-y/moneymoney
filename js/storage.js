@@ -7,8 +7,9 @@
 function saveToLocalCache() {
   try {
     const payload = {
-      version: "5.1-variable-income",
+      version: "5.2-excluded-sources",
       sharedPassphrase: state.sharedPassphrase,
+      excludedSharedSourceIds: state.excludedSharedSourceIds || [],
       personal: {
         sources: state.personalSources,
         expenses: state.personalExpenses,
@@ -60,6 +61,9 @@ function loadFromLocalCache() {
         state.personalIncomeEntries = parsed.personal.incomeEntries || [];
         state.sharedIncomeEntries = parsed.shared ? (parsed.shared.incomeEntries || []) : [];
 
+        // 収支から除外する共有カードID一覧の復元
+        state.excludedSharedSourceIds = parsed.excludedSharedSourceIds || (parsed.personal && parsed.personal.excludedSharedSourceIds) || [];
+
         // 旧バージョン（固定額incomes）からの自動マイグレーション
         if (state.personalIncomeSources.length === 0 && parsed.personal.incomes && parsed.personal.incomes.length > 0) {
           parsed.personal.incomes.forEach((oldInc, idx) => {
@@ -108,10 +112,11 @@ function loadFromLocalCache() {
  */
 function downloadJsonFile(currentUserEmail) {
   const dataStr = JSON.stringify({
-    version: "5.1-variable-income",
+    version: "5.2-excluded-sources",
     exportedAt: new Date().toISOString(),
     userEmail: currentUserEmail || null,
     sharedPassphrase: state.sharedPassphrase,
+    excludedSharedSourceIds: state.excludedSharedSourceIds || [],
     personal: {
       sources: state.personalSources,
       expenses: state.personalExpenses,
