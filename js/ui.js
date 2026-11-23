@@ -63,9 +63,9 @@ function getLocalTodayDateString() {
 }
 
 /**
- * タブ切り替え（ホーム、当月明細、年間一覧、固定費、返済、設定）
+ * タブ切り替え（ホーム、当月明細、年間一覧、固定費、設定）
  */
-const ALL_TABS = ['dashboard', 'expenses', 'yearly', 'recurring', 'debts', 'sources'];
+const ALL_TABS = ['dashboard', 'expenses', 'yearly', 'recurring', 'sources'];
 
 function switchTab(tabId) {
   state.activeTab = tabId;
@@ -143,7 +143,9 @@ function updateSelectOptions() {
     return `<option value="${s.id}">${s.name}${shareTag} (${s.type === 'CREDIT' ? 'クレカ' : '口座振替'})</option>`;
   }).join("");
   if (expSelect) expSelect.innerHTML = opts;
-  if (recSelect) recSelect.innerHTML = opts;
+  if (recSelect) {
+    recSelect.innerHTML = `<option value="CASH">💵 現金支払い</option>` + opts;
+  }
 
   // 収入入力モーダルの収入元セレクト
   const incEntrySelect = document.getElementById("incEntrySourceSelect");
@@ -156,18 +158,6 @@ function updateSelectOptions() {
         return `<option value="${is.id}">${is.name}</option>`;
       }).join("");
     }
-  }
-
-  // 借金・ローンモーダルの支払元セレクト
-  const debtSrcSelect = document.getElementById("debtSourceSelect");
-  if (debtSrcSelect) {
-    let debtOpts = `<option value="CASH">💵 現金支払い (CASH)</option>`;
-    state.sources.forEach(s => {
-      const shareTag = s.isShared ? ' [共有]' : '';
-      const typeLabel = s.type === 'CREDIT' ? '💳 クレカ' : '🏦 口座振替';
-      debtOpts += `<option value="${s.id}">${typeLabel}: ${s.name}${shareTag}</option>`;
-    });
-    debtSrcSelect.innerHTML = debtOpts;
   }
 }
 
@@ -218,21 +208,6 @@ function initDateSelectOptions() {
     optEnd.value = 99;
     optEnd.innerText = `末日`;
     recDaySelect.appendChild(optEnd);
-  }
-
-  const debtPayDaySelect = document.getElementById("debtPaymentDaySelect");
-  if (debtPayDaySelect && debtPayDaySelect.children.length === 0) {
-    for (let i = 1; i <= 28; i++) {
-      const opt = document.createElement("option");
-      opt.value = i;
-      opt.innerText = `毎月 ${i} 日`;
-      if (i === 27) opt.selected = true;
-      debtPayDaySelect.appendChild(opt);
-    }
-    const optEnd = document.createElement("option");
-    optEnd.value = 99;
-    optEnd.innerText = `毎月末日`;
-    debtPayDaySelect.appendChild(optEnd);
   }
 }
 
@@ -349,7 +324,7 @@ function render() {
   // 当月の年払い・固定費の抽出
   const currentRecurring = [];
   state.recurringList.forEach(r => {
-    const src = state.sources.find(s => s.id === r.sourceId);
+    const src = r.sourceId === 'CASH' ? { id: 'CASH', type: 'CASH' } : state.sources.find(s => s.id === r.sourceId);
     if (!src) return;
 
     if (r.frequency === "YEARLY") {
@@ -406,22 +381,14 @@ function render() {
   // カード・口座別の支出と、現金支出を分離
   const cashExpenses = currentExpenses.filter(e => e.sourceId === CASH_SOURCE_ID || e.sourceId === 'CASH');
   const cardExpenses = currentExpenses.filter(e => e.sourceId !== CASH_SOURCE_ID && e.sourceId !== 'CASH');
-
-  // 当月のローン返済明細の計算 & 分離
-  const currentDebts = calculateMonthlyDebtEntries(state.debts || [], state.currentMonth, sortedSources);
-  currentDebts.forEach(d => {
-    d.isExcludedFromBudget = isExcluded(d.sourceId);
-  });
-  const cardDebts = currentDebts.filter(d => d.sourceId !== 'CASH' && d.sourceId !== CASH_SOURCE_ID);
-  const cashDebts = currentDebts.filter(d => d.sourceId === 'CASH' || d.sourceId === CASH_SOURCE_ID);
+  const cashRecurring = currentRecurring.filter(r => r.sourceId === 'CASH' || r.sourceId === CASH_SOURCE_ID);
+  const cardRecurring = currentRecurring.filter(r => r.sourceId !== 'CASH' && r.sourceId !== CASH_SOURCE_ID);
 
   // 収支に反映する項目のみで合計額を計算（除外カードは除外）
-  const cardDebtsTotal = cardDebts.filter(d => !d.isExcludedFromBudget).reduce((sum, d) => sum + Number(d.amount), 0);
-  const cashDebtsTotal = cashDebts.filter(d => !d.isExcludedFromBudget).reduce((sum, d) => sum + Number(d.amount), 0);
-
-  const regularTotal = cardExpenses.filter(e => !e.isExcludedFromBudget).reduce((sum, e) => sum + Number(e.amount), 0) + cardDebtsTotal;
-  const recurringTotal = currentRecurring.filter(r => !r.isExcludedFromBudget).reduce((sum, r) => sum + Number(r.amount), 0);
-  const cashTotal = cashExpenses.filter(e => !e.isExcludedFromBudget).reduce((sum, e) => sum + Number(e.amount), 0) + cashDebtsTotal;
+  const regularTotal = cardExpenses.filter(e => !e.isExcludedFromBudget).reduce((sum, e) => sum + Number(e.amount), 0);
+  const recurringTotal = cardRecurring.filter(r => !r.isExcludedFromBudget).reduce((sum, r) => sum + Number(r.amount), 0);
+  const cashTotal = cashExpenses.filter(e => !e.isExcludedFromBudget).reduce((sum, e) => sum + Number(e.amount), 0)
+                  + cashRecurring.filter(r => !r.isExcludedFromBudget).reduce((sum, r) => sum + Number(r.amount), 0);
   const grandTotal = regularTotal + recurringTotal + cashTotal;
 
   // 当月の収入明細の抽出 & 総収入の計算
@@ -445,15 +412,15 @@ function render() {
   if (recLabel) recLabel.innerText = `¥${recurringTotal.toLocaleString()}`;
   if (cashLabel) cashLabel.innerText = `¥${cashTotal.toLocaleString()}`;
 
-  // 年払い発生アラート
+  // 年払い発生アラート（引き落とし予定）
   const alertBox = document.getElementById("recurringAlertBox");
   if (alertBox) {
-    if (currentRecurring.length > 0) {
+    if (cardRecurring.length > 0) {
       alertBox.classList.remove("hidden");
       const alertText = document.getElementById("recurringAlertText");
       if (alertText) {
         alertText.innerText =
-          `今月は${currentRecurring.map(r => `${r.name} (¥${r.amount.toLocaleString()})`).join("、 ")} の引き落としが予定されています。`;
+          `今月は${cardRecurring.map(r => `${r.name} (¥${r.amount.toLocaleString()})`).join("、 ")} の引き落としが予定されています。`;
       }
     } else {
       alertBox.classList.add("hidden");
@@ -465,8 +432,8 @@ function render() {
     year, month,
     monthlyIncome, grandTotal, netSavings, expenseRatio,
     regularTotal, recurringTotal, cashTotal,
-    currentExpenses, currentRecurring, sortedSources,
-    currentIncomes, cashExpenses, currentDebts
+    currentExpenses, currentRecurring: cardRecurring, sortedSources,
+    currentIncomes, cashExpenses, cashRecurring
   });
 
   // 2. 💳 当月明細タブ（上部に収入一覧 ＋ 中段に引き落とし予定 ＋ 下部に現金＆カード別支出）
@@ -474,8 +441,8 @@ function render() {
     year, month,
     currentIncomes, monthlyIncome,
     regularTotal, recurringTotal, cashTotal,
-    currentExpenses, currentRecurring, sortedSources,
-    cashExpenses, currentDebts
+    currentExpenses, currentRecurring: cardRecurring, sortedSources,
+    cashExpenses, cashRecurring
   });
 
   // 3. 📅 年間支出一覧タブ
@@ -487,14 +454,7 @@ function render() {
     currentRecurring
   });
 
-  // 5. 📉 返済シミュレーションタブ
-  renderDebtsTab({
-    netSavings,
-    currentMonth: state.currentMonth,
-    sources: sortedSources
-  });
-
-  // 6. ⚙️ 設定タブ（カード管理 ＋ 収入元マスター管理）
+  // 5. ⚙️ 設定タブ（カード管理 ＋ 収入元マスター管理）
   renderSourcesTab({
     sortedSources
   });
@@ -511,31 +471,26 @@ function render() {
 /**
  * 📊 ダッシュボードのレンダリング
  */
-function renderDashboardTab({ year, month, monthlyIncome, grandTotal, netSavings, expenseRatio, regularTotal, recurringTotal, cashTotal = 0, currentExpenses, currentRecurring, sortedSources, currentIncomes, cashExpenses = [], currentDebts = [] }) {
+function renderDashboardTab({ year, month, monthlyIncome, grandTotal, netSavings, expenseRatio, regularTotal, recurringTotal, cashTotal = 0, currentExpenses, currentRecurring, sortedSources, currentIncomes, cashExpenses = [], cashRecurring = [] }) {
   const container = document.getElementById("tabContent-dashboard");
   if (!container) return;
 
   const excludedIds = state.excludedSharedSourceIds || [];
   const isExcluded = (id) => excludedIds.includes(id);
 
-  const nextAction = getNextDueAction(currentExpenses, currentRecurring, sortedSources, currentDebts, excludedIds);
+  const nextAction = getNextDueAction(currentExpenses, currentRecurring, sortedSources, excludedIds);
   const isSurplus = netSavings >= 0;
 
-  const totalDebtBalance = (state.debts || []).reduce((sum, d) => sum + Number(d.totalBalance), 0);
-  const totalMonthlyDebtPay = (state.debts || []).reduce((sum, d) => sum + Number(d.monthlyPayment), 0);
-
   // 今年の年間サマリーを計算（ホームバナー用）
-  const curYearSummary = calculateYearlySummary(year, 'DUE_MONTH', state.expenses, state.recurringList, state.sources, state.incomeEntries, state.debts || [], excludedIds);
+  const curYearSummary = calculateYearlySummary(year, 'DUE_MONTH', state.expenses, state.recurringList, state.sources, state.incomeEntries, excludedIds);
 
   // 各カード・口座の引き落とし予定
   const dueItems = sortedSources.map(src => {
     const isSrcExcluded = isExcluded(src.id);
     const cardExpenses = currentExpenses.filter(e => e.sourceId === src.id);
     const cardRecs = currentRecurring.filter(r => r.sourceId === src.id);
-    const cardDebts = currentDebts.filter(d => d.sourceId === src.id);
     const total = cardExpenses.reduce((sum, e) => sum + Number(e.amount), 0) +
-                  cardRecs.reduce((sum, r) => sum + Number(r.amount), 0) +
-                  cardDebts.reduce((sum, d) => sum + Number(d.amount), 0);
+                  cardRecs.reduce((sum, r) => sum + Number(r.amount), 0);
 
     let dateDisplay = "";
     let sortDay = 999;
@@ -647,8 +602,8 @@ function renderDashboardTab({ year, month, monthlyIncome, grandTotal, netSavings
       </div>
     </div>
 
-    <!-- ③【中央グリッド】直近アクション & 現金サマリー & ローン -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- ③【中央グリッド】直近アクション & 現金サマリー（2カラム） -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- カード・口座別の引き落とし予定一覧（次回カウントダウン付き） -->
       <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
         <div class="flex items-center justify-between">
@@ -704,33 +659,35 @@ function renderDashboardTab({ year, month, monthlyIncome, grandTotal, netSavings
       </div>
 
       <!-- 💵 現金支出サマリー（クリックで当月明細の現金枠へジャンプ） -->
-      <div onclick="jumpToCashExpenses()" class="bg-white border border-emerald-200 rounded-2xl p-4 shadow-sm space-y-3 cursor-pointer hover:border-emerald-400 hover:shadow-md transition group">
-        <div class="flex items-center justify-between">
-          <div class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-            <span class="text-base">💵</span> ${month}月の現金支出
-          </div>
-          <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            当月 ${cashExpenses.length} 件
-          </span>
-        </div>
-
-        <div class="p-3 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-1">
-          <div class="text-[10px] text-emerald-800 font-medium">現金利用の総額</div>
-          <div class="text-2xl font-black text-emerald-900">
-            ¥${cashTotal.toLocaleString()}
-          </div>
-          <div class="text-[10px] text-emerald-700">口座引き落とし以外の即時支出</div>
-        </div>
-
-        <div class="text-xs text-slate-500 space-y-1">
-          ${cashExpenses.slice(0, 3).map(ce => `
-            <div class="flex justify-between items-center text-[11px] py-0.5">
-              <span class="text-slate-600 truncate max-w-[130px]">${ce.memo || '未分類'}</span>
-              <span class="font-bold text-slate-800">¥${Number(ce.amount).toLocaleString()}</span>
+      <div onclick="jumpToCashExpenses()" class="bg-white border border-emerald-200 rounded-2xl p-4 shadow-sm space-y-3 cursor-pointer hover:border-emerald-400 hover:shadow-md transition group flex flex-col justify-between">
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <span class="text-base">💵</span> ${month}月の現金支出
             </div>
-          `).join('')}
-          ${cashExpenses.length > 3 ? `<div class="text-[10px] text-slate-400 text-right">ほか ${cashExpenses.length - 3} 件...</div>` : ''}
-          ${cashExpenses.length === 0 ? `<div class="text-[11px] text-slate-400 text-center py-2">今月の現金入力はありません</div>` : ''}
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              当月 ${cashExpenses.length + cashRecurring.length} 件
+            </span>
+          </div>
+
+          <div class="p-3 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-1">
+            <div class="text-[10px] text-emerald-800 font-medium">現金利用の総額</div>
+            <div class="text-2xl font-black text-emerald-900">
+              ¥${cashTotal.toLocaleString()}
+            </div>
+            <div class="text-[10px] text-emerald-700">口座引き落とし以外の即時・現金支出</div>
+          </div>
+
+          <div class="text-xs text-slate-500 space-y-1">
+            ${[...cashRecurring.map(r => ({ memo: `🔄 ${r.name}`, amount: r.amount })), ...cashExpenses].slice(0, 3).map(ce => `
+              <div class="flex justify-between items-center text-[11px] py-0.5">
+                <span class="text-slate-600 truncate max-w-[160px]">${ce.memo || '未分類'}</span>
+                <span class="font-bold text-slate-800">¥${Number(ce.amount).toLocaleString()}</span>
+              </div>
+            `).join('')}
+            ${(cashExpenses.length + cashRecurring.length) > 3 ? `<div class="text-[10px] text-slate-400 text-right">ほか ${(cashExpenses.length + cashRecurring.length) - 3} 件...</div>` : ''}
+            ${(cashExpenses.length + cashRecurring.length) === 0 ? `<div class="text-[11px] text-slate-400 text-center py-2">今月の現金支出はありません</div>` : ''}
+          </div>
         </div>
 
         <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-[11px]">
@@ -740,51 +697,6 @@ function renderDashboardTab({ year, month, monthlyIncome, grandTotal, netSavings
           <span class="text-emerald-600 font-bold group-hover:translate-x-0.5 transition-transform">
             明細を見る ➔
           </span>
-        </div>
-      </div>
-
-      <!-- 借金・ローン返済の進捗ハイライト -->
-      <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-2.5">
-        <div class="flex items-center justify-between">
-          <div class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-            <span class="text-base">📉</span> 借金・ローン返済サマリー
-          </div>
-          <button onclick="switchTab('debts')" class="text-[11px] font-bold text-indigo-600 hover:underline">
-            シミュレーターへ
-          </button>
-        </div>
-
-        ${(state.debts && state.debts.length > 0) ? `
-          <div class="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
-            <div class="flex justify-between items-center">
-              <div>
-                <span class="text-[10px] text-amber-800 font-medium block">現在の借金・ローン総残高</span>
-                <span class="text-lg font-black text-amber-950">¥${totalDebtBalance.toLocaleString()}</span>
-              </div>
-              <div class="text-right">
-                <span class="text-[10px] text-amber-800 font-medium block">毎月返済総額</span>
-                <span class="text-sm font-bold text-amber-900">¥${totalMonthlyDebtPay.toLocaleString()}/月</span>
-              </div>
-            </div>
-
-            ${isSurplus && netSavings > 0 ? `
-              <div class="text-[10px] text-emerald-800 bg-white/80 p-2 rounded-lg border border-emerald-200 leading-snug">
-                💡 <strong>チャンス:</strong> 今月の手残り（¥${netSavings.toLocaleString()}）の一部を繰り上げ返済に充てると、完済を大幅に短縮できます！
-              </div>
-            ` : ''}
-          </div>
-        ` : `
-          <div class="p-3 text-center text-slate-400 text-xs bg-slate-50 rounded-xl space-y-1">
-            <div>借金・ローンの登録はありません</div>
-            <button onclick="openCreateDebtModal()" class="text-indigo-600 font-bold hover:underline text-[11px]">＋ 返済管理項目を追加する</button>
-          </div>
-        `}
-
-        <div class="flex justify-between items-center pt-1 text-[11px]">
-          <span class="text-slate-400 text-[10px]">登録ローン数: ${(state.debts || []).length}件</span>
-          <button onclick="switchTab('debts')" class="text-amber-800 font-bold hover:underline">
-            返済シミュレーション ➔
-          </button>
         </div>
       </div>
     </div>
@@ -829,7 +741,6 @@ function renderYearlyTab() {
     state.recurringList,
     state.sources,
     state.incomeEntries,
-    state.debts || [],
     state.excludedSharedSourceIds || []
   );
 
@@ -1085,7 +996,7 @@ function renderYearlyTab() {
 /**
  * 💳 利用明細タブのレンダリング（上部: 当月の収入明細 ＋ 下部: カード別支出明細）
  */
-function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regularTotal, recurringTotal, cashTotal = 0, currentExpenses, currentRecurring, sortedSources, cashExpenses = [], currentDebts = [] }) {
+function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regularTotal, recurringTotal, cashTotal = 0, currentExpenses, currentRecurring, sortedSources, cashExpenses = [], cashRecurring = [] }) {
   const expensesContainer = document.getElementById("tabContent-expenses");
   if (!expensesContainer) return;
 
@@ -1179,12 +1090,10 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
       const isSrcExcluded = (state.excludedSharedSourceIds || []).includes(src.id);
       const cardExpenses = currentExpenses.filter(e => e.sourceId === src.id);
       const cardRecs = currentRecurring.filter(r => r.sourceId === src.id);
-      const cardDebts = (currentDebts || []).filter(d => d.sourceId === src.id);
 
       const regAmt = cardExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
       const recAmt = cardRecs.reduce((sum, r) => sum + Number(r.amount), 0);
-      const debtAmt = cardDebts.reduce((sum, d) => sum + Number(d.amount), 0);
-      const total = regAmt + recAmt + debtAmt;
+      const total = regAmt + recAmt;
 
       const lastDayOfCurMonth = new Date(year, month, 0).getDate();
       const displayDay = src.paymentDay === 99 ? lastDayOfCurMonth : src.paymentDay;
@@ -1192,46 +1101,6 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
 
       let itemsHtml = "";
       let mobileItemsHtml = "";
-
-      // ローン返済の表示（最上段）
-      if (cardDebts.length > 0) {
-        itemsHtml += cardDebts.map(d => `
-          <tr onclick="openEditDebtOverrideModal('${d.debtId}', '${d.payMonth}')" class="${isSrcExcluded ? 'opacity-65' : ''} bg-indigo-50/40 hover:bg-indigo-100/60 cursor-pointer transition group" title="クリックしてこの月の返済額を変更">
-            <td class="p-3 text-indigo-700 whitespace-nowrap font-medium">
-              <span class="inline-block px-1.5 py-0.5 rounded bg-indigo-100 text-[10px] text-indigo-800 border border-indigo-300 font-bold mr-1">🏦 ローン返済</span>
-              ${isSrcExcluded ? '<span class="inline-block px-1.5 py-0.5 rounded bg-slate-200 text-[9px] text-slate-700 font-bold mr-1">除外</span>' : ''}
-              <span class="text-slate-500 text-[11px]">${d.payDate}</span>
-            </td>
-            <td class="p-3 text-indigo-950 font-bold break-words leading-relaxed whitespace-normal">
-              ${d.memo}
-              ${d.isOverridden ? '<span class="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold ml-1.5 border border-amber-300">●今月返済額変更済</span>' : ''}
-              <span class="opacity-0 group-hover:opacity-100 text-[10px] text-indigo-600 font-semibold ml-1.5 transition-opacity">✏️金額変更</span>
-            </td>
-            <td class="p-3 text-right ${isSrcExcluded ? 'text-slate-400 font-bold' : 'font-black text-indigo-950'} whitespace-nowrap">¥${Number(d.amount).toLocaleString()}</td>
-            <td class="p-3 text-center text-xs text-slate-400">固定</td>
-          </tr>
-        `).join("");
-
-        mobileItemsHtml += cardDebts.map(d => `
-          <div onclick="openEditDebtOverrideModal('${d.debtId}', '${d.payMonth}')" class="${isSrcExcluded ? 'opacity-65' : ''} p-3.5 bg-indigo-50/40 hover:bg-indigo-100/60 active:bg-indigo-100 cursor-pointer transition flex items-start justify-between gap-3 group" title="タップしてこの月の返済額を変更">
-            <div class="min-w-0 flex-1 space-y-1">
-              <div class="flex items-center gap-1.5 text-[10px]">
-                <span class="px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold">🏦 ローン返済</span>
-                ${isSrcExcluded ? '<span class="px-1 py-0.2 rounded bg-slate-200 text-slate-700 font-bold text-[9px]">除外</span>' : ''}
-                <span class="text-slate-500">${d.payDate}</span>
-                <span class="text-indigo-600">✏️変更</span>
-              </div>
-              <div class="text-xs font-bold text-indigo-950 break-words leading-snug whitespace-normal">
-                ${d.memo}
-                ${d.isOverridden ? '<span class="text-[9px] px-1 py-0.2 rounded bg-amber-100 text-amber-800 font-bold ml-1">●変更済</span>' : ''}
-              </div>
-            </div>
-            <div class="text-right shrink-0">
-              <span class="text-sm ${isSrcExcluded ? 'text-slate-400 font-bold' : 'font-black text-indigo-950'}">¥${Number(d.amount).toLocaleString()}</span>
-            </div>
-          </div>
-        `).join("");
-      }
 
       if (cardExpenses.length > 0) {
         itemsHtml += cardExpenses.map(e => `
@@ -1307,7 +1176,7 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
         `).join("");
       }
 
-      const hasItems = cardExpenses.length > 0 || cardRecs.length > 0 || cardDebts.length > 0;
+      const hasItems = cardExpenses.length > 0 || cardRecs.length > 0;
       const scheduleDescription = src.type === 'CREDIT' 
         ? `締め日: <span class="font-medium text-slate-700">${src.closingDay === 99 ? '月末' : src.closingDay + '日'}</span> ｜ 引落日: <span class="font-bold text-slate-800">${month}月${displayDay}日</span> <span class="text-slate-400 text-[10px]">(${offsetName}${src.paymentDay === 99 ? '末日' : src.paymentDay + '日'}払い)</span>`
         : `引落日: <span class="font-semibold text-teal-800">各明細の指定日に引き落とし（口座振替）</span>`;
@@ -1367,10 +1236,8 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
   const dueCardsHtml = sortedSources.map(src => {
     const cardExpenses = currentExpenses.filter(e => e.sourceId === src.id);
     const cardRecs = currentRecurring.filter(r => r.sourceId === src.id);
-    const cardDebts = (currentDebts || []).filter(d => d.sourceId === src.id);
     const total = cardExpenses.reduce((sum, e) => sum + Number(e.amount), 0) +
-                  cardRecs.reduce((sum, r) => sum + Number(r.amount), 0) +
-                  cardDebts.reduce((sum, d) => sum + Number(d.amount), 0);
+                  cardRecs.reduce((sum, r) => sum + Number(r.amount), 0);
 
     let dateDisplay = "";
     if (src.type === 'CREDIT') {
@@ -1424,49 +1291,44 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
   `;
 
   // 3. 現金支出セクション（緑・エメラルド系バッジ）
-  const cashDebts = (currentDebts || []).filter(d => d.sourceId === 'CASH' || d.sourceId === CASH_SOURCE_ID);
   let cashItemsHtml = "";
   let cashMobileItemsHtml = "";
 
-  if (cashDebts.length > 0) {
-    cashItemsHtml += cashDebts.map(d => `
-      <tr onclick="openEditDebtOverrideModal('${d.debtId}', '${d.payMonth}')" class="bg-indigo-50/50 hover:bg-indigo-100/60 cursor-pointer transition group" title="クリックしてこの月の返済額を変更">
-        <td class="p-3 text-indigo-700 whitespace-nowrap font-medium">
-          <span class="inline-block px-1.5 py-0.5 rounded bg-indigo-100 text-[10px] text-indigo-800 border border-indigo-300 font-bold mr-1">🏦 ローン返済</span>
-          <span class="text-slate-500 text-[11px]">${d.payDate}</span>
+  if (cashRecurring.length > 0) {
+    cashItemsHtml += cashRecurring.map(r => `
+      <tr onclick="openEditRecurringModal('${r.id}')" class="bg-amber-50/40 hover:bg-amber-100/60 cursor-pointer transition group" title="クリックして固定費を編集">
+        <td class="p-3 text-amber-800 whitespace-nowrap font-medium">
+          <span class="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-[10px] text-amber-800 border border-amber-300 font-bold mr-1">固定/年払</span>
+          <span class="text-slate-500 text-[11px]">${r.payDate}</span>
         </td>
-        <td class="p-3 text-indigo-950 font-bold break-words leading-relaxed whitespace-normal">
-          ${d.memo}
-          ${d.isOverridden ? '<span class="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold ml-1.5 border border-amber-300">●今月返済額変更済</span>' : ''}
-          <span class="opacity-0 group-hover:opacity-100 text-[10px] text-indigo-600 font-semibold ml-1.5 transition-opacity">✏️金額変更</span>
+        <td class="p-3 text-amber-900 font-bold break-words leading-relaxed whitespace-normal">
+          ${r.name}
+          <span class="opacity-0 group-hover:opacity-100 text-[10px] text-amber-600 font-semibold ml-1.5 transition-opacity">✏️編集</span>
         </td>
-        <td class="p-3 text-right font-black text-indigo-950 whitespace-nowrap">¥${Number(d.amount).toLocaleString()}</td>
+        <td class="p-3 text-right font-bold text-amber-800 whitespace-nowrap">¥${Number(r.amount).toLocaleString()}</td>
         <td class="p-3 text-center text-xs text-slate-400">現金</td>
       </tr>
     `).join("");
 
-    cashMobileItemsHtml += cashDebts.map(d => `
-      <div onclick="openEditDebtOverrideModal('${d.debtId}', '${d.payMonth}')" class="p-3.5 bg-indigo-50/40 hover:bg-indigo-100/60 active:bg-indigo-100 cursor-pointer transition flex items-start justify-between gap-3 group" title="タップしてこの月の返済額を変更">
+    cashMobileItemsHtml += cashRecurring.map(r => `
+      <div onclick="openEditRecurringModal('${r.id}')" class="p-3.5 bg-amber-50/40 hover:bg-amber-100/60 active:bg-amber-100 cursor-pointer transition flex items-start justify-between gap-3 group" title="タップして固定費を編集">
         <div class="min-w-0 flex-1 space-y-1">
-          <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
-            <span class="text-[10px] px-1.5 py-0.2 rounded font-bold bg-indigo-100 text-indigo-800 border border-indigo-300">🏦 ローン返済</span>
-            <span>${d.payDate}</span>
-            <span class="text-indigo-600">✏️変更</span>
+          <div class="flex items-center gap-1.5 text-[10px]">
+            <span class="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 font-bold">固定/年払</span>
+            <span class="text-slate-500">${r.payDate}</span>
+            <span class="text-amber-700">✏️編集</span>
           </div>
-          <div class="text-xs font-bold text-indigo-950 break-words leading-snug whitespace-normal">
-            ${d.memo}
-            ${d.isOverridden ? '<span class="text-[9px] px-1 py-0.2 rounded bg-amber-100 text-amber-800 font-bold ml-1">●変更済</span>' : ''}
-          </div>
+          <div class="text-xs font-bold text-amber-900 break-words leading-snug whitespace-normal">${r.name}</div>
         </div>
         <div class="text-right shrink-0">
-          <span class="text-sm font-black text-indigo-950">¥${Number(d.amount).toLocaleString()}</span>
+          <span class="text-sm font-black text-amber-800">¥${Number(r.amount).toLocaleString()}</span>
         </div>
       </div>
     `).join("");
   }
 
   if (cashExpenses.length > 0) {
-    cashItemsHtml = cashExpenses.map(e => `
+    cashItemsHtml += cashExpenses.map(e => `
       <tr onclick="openEditExpenseModal('${e.id}')" class="hover:bg-emerald-50/50 cursor-pointer transition group" title="クリックして編集">
         <td class="p-3 text-slate-500 whitespace-nowrap">${e.date}</td>
         <td class="p-3 text-slate-800 font-medium break-words leading-relaxed whitespace-normal">
@@ -1480,7 +1342,7 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
       </tr>
     `).join("");
 
-    cashMobileItemsHtml = cashExpenses.map(e => `
+    cashMobileItemsHtml += cashExpenses.map(e => `
       <div onclick="openEditExpenseModal('${e.id}')" class="p-3.5 hover:bg-emerald-50/50 active:bg-emerald-100/50 cursor-pointer transition flex items-start justify-between gap-3 group" title="タップして編集">
         <div class="min-w-0 flex-1 space-y-1">
           <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
@@ -1528,7 +1390,7 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
       </div>
 
       <div class="block sm:hidden divide-y divide-slate-100">
-        ${(cashExpenses.length > 0 || cashDebts.length > 0) ? cashMobileItemsHtml : `<div class="p-4 text-center text-slate-400 text-xs">当月の現金支出はありません</div>`}
+        ${(cashExpenses.length > 0 || cashRecurring.length > 0) ? cashMobileItemsHtml : `<div class="p-4 text-center text-slate-400 text-xs">当月の現金支出はありません</div>`}
       </div>
 
       <div class="hidden sm:block overflow-x-auto">
@@ -1542,7 +1404,7 @@ function renderExpensesTab({ year, month, currentIncomes, monthlyIncome, regular
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            ${(cashExpenses.length > 0 || cashDebts.length > 0) ? cashItemsHtml : `<tr><td colspan="4" class="p-4 text-center text-slate-400 text-xs">当月の現金支出はありません</td></tr>`}
+            ${(cashExpenses.length > 0 || cashRecurring.length > 0) ? cashItemsHtml : `<tr><td colspan="4" class="p-4 text-center text-slate-400 text-xs">当月の現金支出はありません</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -1571,7 +1433,8 @@ function renderRecurringTab({ year, month, currentRecurring }) {
   const recurringContainer = document.getElementById("recurringListContainer");
   if (recurringContainer) {
     recurringContainer.innerHTML = state.recurringList.map(r => {
-      const src = state.sources.find(s => s.id === r.sourceId);
+      const isCash = r.sourceId === 'CASH';
+      const src = isCash ? { id: 'CASH', name: '💵 現金支払い', type: 'CASH' } : state.sources.find(s => s.id === r.sourceId);
       const dueInfo = src ? getRecurringDueDateInfo(r, src, year) : null;
       const isEnded = Boolean(r.endMonth && state.currentMonth > r.endMonth);
       const isNotStarted = Boolean(r.startMonth && state.currentMonth < r.startMonth);
@@ -1609,7 +1472,7 @@ function renderRecurringTab({ year, month, currentRecurring }) {
             <h4 class="font-bold ${isOutOfPeriod ? 'text-slate-600' : 'text-slate-900'} text-sm mt-1.5">${r.name}</h4>
             <div class="mt-2 text-[11px] text-slate-600 space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
               <div>支払元: <span class="font-semibold text-slate-800">${src ? src.name : '不明'}</span></div>
-              <div>引落予定: <span class="font-bold ${isOutOfPeriod ? 'text-slate-500' : 'text-amber-800'}">${payDateLabel}</span></div>
+              <div>${isCash ? '支払予定' : '引落予定'}: <span class="font-bold ${isOutOfPeriod ? 'text-slate-500' : 'text-amber-800'}">${payDateLabel}</span></div>
               ${periodLabel ? `<div>期間: <span class="font-medium text-slate-700">${periodLabel}</span></div>` : ''}
             </div>
           </div>
@@ -1620,125 +1483,6 @@ function renderRecurringTab({ year, month, currentRecurring }) {
       `;
     }).join("");
   }
-}
-
-/**
- * 📉 返済シミュレーションタブのレンダリング
- */
-function renderDebtsTab({ netSavings, currentMonth, sources = [] }) {
-  const debtsContainer = document.getElementById("debtsListContainer");
-  if (!debtsContainer) return;
-
-  const debts = state.debts || [];
-  if (debts.length === 0) {
-    debtsContainer.innerHTML = `
-      <div class="p-8 text-center text-slate-400 text-xs bg-white border border-slate-200 rounded-2xl space-y-2">
-        <div class="text-2xl">🎉</div>
-        <div class="font-bold text-slate-700">登録されている借金・ローンはありません</div>
-        <p class="text-[11px] text-slate-500">カーローン、奨学金、住宅ローン、カードローン等を登録すると、毎月の明細に自動反映され、完済予定や繰り上げ返済シミュレーションができます。</p>
-        <button onclick="openCreateDebtModal()" class="mt-2 px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl text-xs">
-          ＋ 借金・ローンを追加
-        </button>
-      </div>
-    `;
-    return;
-  }
-
-  const extraPayInput = document.getElementById("extraPaySimInput");
-  const extraAmount = extraPayInput ? Number(extraPayInput.value) : 10000;
-  const curM = currentMonth || state.currentMonth;
-
-  debtsContainer.innerHTML = debts.map(d => {
-    const normalSim = simulateDebtPayoff(d.totalBalance, d.monthlyPayment, d.interestRate, 0);
-    const extraSim = simulateDebtPayoff(d.totalBalance, d.monthlyPayment, d.interestRate, extraAmount);
-
-    const savedMonths = Math.max(normalSim.months - extraSim.months, 0);
-    const savedInterest = Math.max(normalSim.totalInterest - extraSim.totalInterest, 0);
-
-    const src = sources.find(s => s.id === d.sourceId);
-    let srcName = "💵 現金支払い";
-    let payDayText = `${d.paymentDay === 99 ? '末日' : (d.paymentDay || 27) + '日'}`;
-    if (d.sourceId !== 'CASH' && src) {
-      srcName = `${src.type === 'CREDIT' ? '💳' : '🏦'} ${src.name}`;
-      payDayText = src.type === 'CREDIT' ? `${src.paymentDay === 99 ? '末日' : src.paymentDay + '日'}` : `${d.paymentDay === 99 ? '末日' : (d.paymentDay || 27) + '日'}`;
-    }
-
-    const curOverride = d.monthlyOverrides && d.monthlyOverrides[curM] != null ? Number(d.monthlyOverrides[curM]) : null;
-    const curMonthPay = curOverride != null ? curOverride : Number(d.monthlyPayment);
-
-    // 回数計算
-    let installmentText = "";
-    if (d.startMonth && d.endMonth) {
-      const [sy, sm] = d.startMonth.split("-").map(Number);
-      const [ey, em] = d.endMonth.split("-").map(Number);
-      const totalInst = (ey - sy) * 12 + (em - sm) + 1;
-      const [cy, cm] = curM.split("-").map(Number);
-      const curInst = (cy - sy) * 12 + (cm - sm) + 1;
-      if (curInst >= 1 && curInst <= totalInst) {
-        installmentText = ` (当月: 第${curInst}/${totalInst}回)`;
-      } else if (curInst > totalInst) {
-        installmentText = ` (完済済)`;
-      }
-    }
-
-    return `
-      <div class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
-        <!-- ヘッダー -->
-        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="text-xs px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                年利 ${d.interestRate}%
-              </span>
-              <h3 class="font-black text-slate-900 text-sm sm:text-base">${d.name}</h3>
-              ${d.startMonth && d.endMonth ? `
-                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  ${d.startMonth} 〜 ${d.endMonth}${installmentText}
-                </span>
-              ` : ''}
-            </div>
-            <div class="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-3">
-              <span>基本返済額: <strong class="text-slate-800">¥${Number(d.monthlyPayment).toLocaleString()}/月</strong></span>
-              <span>支払元: <strong class="text-indigo-800">${srcName}</strong> (${payDayText}引落)</span>
-            </div>
-          </div>
-          <div class="flex items-center gap-1.5">
-            <button onclick="openEditDebtOverrideModal('${d.id}', '${curM}')" class="px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition active:scale-95">
-              ${curM}月 返済額変更
-            </button>
-            <button onclick="openEditDebtModal('${d.id}')" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">設定編集</button>
-            <button onclick="deleteDebt('${d.id}')" class="px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg">削除</button>
-          </div>
-        </div>
-
-        <!-- 金額・残高・当月予定カード -->
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <span class="text-[10px] text-slate-400 block font-medium">借入総額</span>
-            <span class="text-lg font-black text-slate-900">¥${Number(d.totalAmount || d.totalBalance).toLocaleString()}</span>
-          </div>
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <span class="text-[10px] text-slate-400 block font-medium">現在の残高</span>
-            <span class="text-lg font-black text-amber-900">¥${Number(d.totalBalance).toLocaleString()}</span>
-          </div>
-          <div class="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100">
-            <span class="text-[10px] text-indigo-700 block font-bold">${curM}月の引落予定額</span>
-            <span class="text-lg font-black text-indigo-950">¥${curMonthPay.toLocaleString()}</span>
-            ${curOverride != null ? '<span class="text-[10px] text-amber-700 font-bold block">●今月個別変更適用中</span>' : ''}
-          </div>
-          <div class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl">
-            <span class="text-[10px] text-emerald-800 block font-bold">＋¥${extraAmount.toLocaleString()}/月 繰上時</span>
-            <span class="text-base font-black text-emerald-700">
-              ${extraSim.years}年 ${extraSim.remMonths}ヶ月
-            </span>
-            <span class="text-[10px] text-emerald-800 font-bold block truncate">
-              ${savedMonths > 0 ? `約${savedMonths}ヶ月 & ¥${savedInterest.toLocaleString()}節約` : '短縮なし'}
-            </span>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join("");
 }
 
 /**

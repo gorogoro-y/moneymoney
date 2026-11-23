@@ -58,7 +58,7 @@ function calculateDueDate(dateStr, source) {
  * 年払い・固定費項目の引落予定日情報を計算
  */
 function getRecurringDueDateInfo(recurringItem, source, targetYear) {
-  if (!source) return { payMonth: "", payDate: "", useDateStr: "" };
+  if (!source && recurringItem?.sourceId !== 'CASH') return { payMonth: "", payDate: "", useDateStr: "" };
 
   const year = targetYear || new Date().getFullYear();
   const month = recurringItem.targetMonth || 1;
@@ -66,6 +66,15 @@ function getRecurringDueDateInfo(recurringItem, source, targetYear) {
   const day = recurringItem.targetDay === 99 ? lastDayOfMonth : Math.min(recurringItem.targetDay || 1, lastDayOfMonth);
 
   const useDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  if (recurringItem?.sourceId === 'CASH' || source?.type === 'CASH') {
+    return {
+      payMonth: useDateStr.slice(0, 7),
+      payDate: useDateStr,
+      useDateStr,
+      useMonth: month,
+      useDay: day
+    };
+  }
   const dueInfo = calculateDueDate(useDateStr, source);
 
   return { ...dueInfo, useDateStr, useMonth: month, useDay: day };
@@ -166,87 +175,9 @@ function calculateMonthlyIncome(incomeEntries, targetMonth) {
 }
 
 /**
- * 指定月（YYYY-MM）におけるローンの返済情報を計算
- */
-function getDebtDueInfoForMonth(debt, targetMonth, sources) {
-  if (!debt || !targetMonth) return null;
-
-  // 開始年月と終了年月があれば、その期間内か判定
-  if (debt.startMonth && targetMonth < debt.startMonth) return null;
-  if (debt.endMonth && targetMonth > debt.endMonth) return null;
-
-  // 返済額（月ごとの個別修正があれば優先、なければ基本返済額）
-  let amount = Number(debt.monthlyPayment) || 0;
-  if (debt.monthlyOverrides && debt.monthlyOverrides[targetMonth] != null) {
-    amount = Number(debt.monthlyOverrides[targetMonth]);
-  }
-
-  // 支払日（payDate）の算出
-  const [y, m] = targetMonth.split("-").map(Number);
-  const lastDay = new Date(y, m, 0).getDate();
-
-  const sourceId = debt.sourceId || "CASH";
-  const src = sources ? sources.find(s => s.id === sourceId) : null;
-
-  let payDate = "";
-  if (sourceId === 'CASH' || !src) {
-    const day = debt.paymentDay === 99 ? lastDay : Math.min(debt.paymentDay || 27, lastDay);
-    payDate = `${targetMonth}-${String(day).padStart(2, '0')}`;
-  } else if (src.type === 'CREDIT') {
-    const day = src.paymentDay === 99 ? lastDay : Math.min(src.paymentDay || 27, lastDay);
-    payDate = `${targetMonth}-${String(day).padStart(2, '0')}`;
-  } else {
-    // 銀行口座振替
-    const day = debt.paymentDay === 99 ? lastDay : Math.min(debt.paymentDay || 27, lastDay);
-    payDate = `${targetMonth}-${String(day).padStart(2, '0')}`;
-  }
-
-  // 回数計算（第X回 / 全Y回）
-  let currentInstallment = null;
-  let totalInstallments = null;
-  if (debt.startMonth && debt.endMonth) {
-    const [sy, sm] = debt.startMonth.split("-").map(Number);
-    const [ey, em] = debt.endMonth.split("-").map(Number);
-    totalInstallments = (ey - sy) * 12 + (em - sm) + 1;
-    currentInstallment = (y - sy) * 12 + (m - sm) + 1;
-  }
-
-  return {
-    id: `debt-pay-${debt.id}-${targetMonth}`,
-    debtId: debt.id,
-    isDebt: true,
-    name: debt.name,
-    amount,
-    payDate,
-    payMonth: targetMonth,
-    date: payDate,
-    memo: `🏦 ローン返済: ${debt.name}${totalInstallments ? ` (${currentInstallment}/${totalInstallments}回)` : ''}`,
-    sourceId,
-    src,
-    isShared: !!debt.isShared,
-    currentInstallment,
-    totalInstallments,
-    isOverridden: debt.monthlyOverrides && debt.monthlyOverrides[targetMonth] != null
-  };
-}
-
-/**
- * 指定月に有効なすべてのローン返済明細を取得
- */
-function calculateMonthlyDebtEntries(debts, targetMonth, sources) {
-  if (!debts || debts.length === 0 || !targetMonth) return [];
-  const list = [];
-  debts.forEach(d => {
-    const info = getDebtDueInfoForMonth(d, targetMonth, sources);
-    if (info) list.push(info);
-  });
-  return list;
-}
-
-/**
  * 次回直近の引き落としアクションを取得（カウントダウン用）
  */
-function getNextDueAction(currentExpenses, currentRecurring, sources, currentDebts = [], excludedSourceIds = []) {
+function getNextDueAction(currentExpenses, currentRecurring, sources, excludedSourceIds = []) {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
   const todayStr = local.toISOString().split("T")[0];
@@ -265,21 +196,11 @@ function getNextDueAction(currentExpenses, currentRecurring, sources, currentDeb
   });
 
   currentRecurring.forEach(r => {
-    if (isExcluded(r.sourceId)) return; // 収支除外カードは除外
+    if (r.sourceId === 'CASH' || isExcluded(r.sourceId)) return; // 現金支出または収支除外カードは除外
     if (r.payDate && r.payDate >= todayStr) {
       const key = `${r.sourceId}_${r.payDate}`;
       const prev = payMap.get(key) || { sourceId: r.sourceId, payDate: r.payDate, amount: 0 };
       prev.amount += Number(r.amount);
-      payMap.set(key, prev);
-    }
-  });
-
-  (currentDebts || []).forEach(d => {
-    if (d.sourceId === 'CASH' || isExcluded(d.sourceId)) return; // 現金返済または収支除外カードは除外
-    if (d.payDate && d.payDate >= todayStr) {
-      const key = `${d.sourceId}_${d.payDate}`;
-      const prev = payMap.get(key) || { sourceId: d.sourceId, payDate: d.payDate, amount: 0 };
-      prev.amount += Number(d.amount);
       payMap.set(key, prev);
     }
   });
@@ -307,57 +228,6 @@ function getNextDueAction(currentExpenses, currentRecurring, sources, currentDeb
 }
 
 /**
- * 借金・ローンの返済シミュレーション計算
- */
-function simulateDebtPayoff(totalBalance, monthlyPayment, interestRate = 0, extraMonthly = 0) {
-  const balance = Number(totalBalance) || 0;
-  const basePay = Number(monthlyPayment) || 0;
-  const extra = Number(extraMonthly) || 0;
-  const rate = (Number(interestRate) || 0) / 100 / 12; // 月利
-
-  if (balance <= 0 || (basePay + extra) <= 0) {
-    return { months: 0, totalInterest: 0, totalPayment: 0, years: 0, remMonths: 0 };
-  }
-
-  if (rate > 0 && balance * rate >= (basePay + extra)) {
-    return { infinite: true, months: 999, totalInterest: 0, totalPayment: 0 };
-  }
-
-  let curBalance = balance;
-  let months = 0;
-  let totalInterest = 0;
-  const maxMonths = 600;
-
-  while (curBalance > 0 && months < maxMonths) {
-    months++;
-    const monthlyInt = Math.floor(curBalance * rate);
-    totalInterest += monthlyInt;
-
-    const totalPayThisMonth = basePay + extra;
-    const principalPay = totalPayThisMonth - monthlyInt;
-
-    if (curBalance <= principalPay) {
-      curBalance = 0;
-      break;
-    } else {
-      curBalance -= principalPay;
-    }
-  }
-
-  const years = Math.floor(months / 12);
-  const remMonths = months % 12;
-
-  return {
-    months,
-    years,
-    remMonths,
-    totalInterest,
-    totalPayment: balance + totalInterest,
-    infinite: false
-  };
-}
-
-/**
  * 1年分（1月〜12月）の月別支出・収入および年間統計サマリーを計算
  * @param {number} targetYear 
  * @param {'DUE_MONTH' | 'USE_MONTH'} mode 
@@ -365,8 +235,9 @@ function simulateDebtPayoff(totalBalance, monthlyPayment, interestRate = 0, extr
  * @param {Array} recurringList 
  * @param {Array} sources 
  * @param {Array} incomeEntries 
+ * @param {Array} excludedSourceIds
  */
-function calculateYearlySummary(targetYear, mode, expenses, recurringList, sources, incomeEntries = [], debts = [], excludedSourceIds = []) {
+function calculateYearlySummary(targetYear, mode, expenses, recurringList, sources, incomeEntries = [], excludedSourceIds = []) {
   const monthsData = [];
   let grandExpense = 0;
   let grandIncome = 0;
@@ -379,9 +250,6 @@ function calculateYearlySummary(targetYear, mode, expenses, recurringList, sourc
     let regularExpenses = [];
     let cashExpenses = [];
     let curRecurring = [];
-
-    // ローン返済の抽出
-    const curDebts = calculateMonthlyDebtEntries(debts, monthKey, sources);
 
     if (mode === 'DUE_MONTH') {
       // 引き落とし月基準
@@ -402,7 +270,7 @@ function calculateYearlySummary(targetYear, mode, expenses, recurringList, sourc
 
       recurringList.forEach(r => {
         if (isExcluded(r.sourceId)) return; // 収支除外カードは除外
-        const src = sources.find(s => s.id === r.sourceId);
+        const src = r.sourceId === 'CASH' ? { id: 'CASH', type: 'CASH' } : sources.find(s => s.id === r.sourceId);
         if (!src) return;
         if (r.frequency === 'MONTHLY') {
           [-1, 0, 1].forEach(offsetMonth => {
@@ -450,22 +318,11 @@ function calculateYearlySummary(targetYear, mode, expenses, recurringList, sourc
       });
     }
 
-    // ローン返済額を仕分け
-    let debtRegTotal = 0;
-    let debtCashTotal = 0;
-    curDebts.forEach(d => {
-      if (isExcluded(d.sourceId)) return; // 収支除外カードは除外
-      if (d.sourceId === 'CASH') {
-        debtCashTotal += d.amount;
-      } else {
-        debtRegTotal += d.amount;
-      }
-    });
-
-    const regTotal = regularExpenses.reduce((sum, e) => sum + Number(e.amount), 0) + debtRegTotal;
-    const recTotal = curRecurring.reduce((sum, r) => sum + Number(r.amount), 0);
-    const cashTotal = cashExpenses.reduce((sum, e) => sum + Number(e.amount), 0) + debtCashTotal;
-    const monthTotal = regTotal + recTotal + cashTotal;
+    const regTotal = regularExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const recCardTotal = curRecurring.filter(r => r.sourceId !== 'CASH').reduce((sum, r) => sum + Number(r.amount), 0);
+    const recCashTotal = curRecurring.filter(r => r.sourceId === 'CASH').reduce((sum, r) => sum + Number(r.amount), 0);
+    const cashTotal = cashExpenses.reduce((sum, e) => sum + Number(e.amount), 0) + recCashTotal;
+    const monthTotal = regTotal + recCardTotal + cashTotal;
 
     const monthIncome = (incomeEntries || []).reduce((sum, ie) => {
       if (ie.date && ie.date.startsWith(monthKey)) {
@@ -481,24 +338,17 @@ function calculateYearlySummary(targetYear, mode, expenses, recurringList, sourc
       maxMonth = { month: m, total: monthTotal };
     }
 
-    // 特記事項リストにローンも含める
-    const allNotices = [...curRecurring];
-    curDebts.forEach(d => {
-      allNotices.push({ name: `🏦 ${d.name}返済`, amount: d.amount });
-    });
-
     monthsData.push({
       month: m,
       monthKey,
       regularTotal: regTotal,
-      recurringTotal: recTotal,
+      recurringTotal: recCardTotal,
       cashTotal,
       total: monthTotal,
       incomeTotal: monthIncome,
       netSavings: monthIncome - monthTotal,
-      recurringItems: allNotices,
-      debtsCount: curDebts.length,
-      itemCount: regularExpenses.length + cashExpenses.length + curRecurring.length + curDebts.length
+      recurringItems: [...curRecurring],
+      itemCount: regularExpenses.length + cashExpenses.length + curRecurring.length
     });
   }
 
